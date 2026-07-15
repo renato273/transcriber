@@ -45,7 +45,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 
   try {
-    const { type, name, apiKey, isActive, isDefaultTranscription, isDefaultTranslation } = await request.json();
+    const { type, name, apiKey, baseUrl, isActive, isDefaultTranscription, isDefaultTranslation } = await request.json();
 
     if (!type || !name) {
       return new Response(JSON.stringify({ error: 'Faltan campos type o name' }), {
@@ -70,6 +70,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
     }
 
+    const normalizedBaseUrl =
+      typeof baseUrl === 'string' && baseUrl.trim() ? baseUrl.trim().replace(/\/$/, '') : null;
+
     // Handle defaults logic
     if (isDefaultTranscription) {
       // Unset other defaults
@@ -90,6 +93,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       update: {
         name,
         apiKey: finalApiKey,
+        baseUrl: normalizedBaseUrl,
         isActive: !!isActive,
         isDefaultTranscription: !!isDefaultTranscription,
         isDefaultTranslation: !!isDefaultTranslation
@@ -98,6 +102,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         type,
         name,
         apiKey: finalApiKey,
+        baseUrl: normalizedBaseUrl,
         isActive: !!isActive,
         isDefaultTranscription: !!isDefaultTranscription,
         isDefaultTranslation: !!isDefaultTranslation

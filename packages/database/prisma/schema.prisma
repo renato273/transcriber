@@ -46,6 +46,9 @@ enum ProviderType {
   GOOGLE
   NVIDIA
   OPENROUTER
+  MISTRAL
+  GROQ
+  GITHUB
 }
 
 model AIProvider {

@@ -1,0 +1,4 @@
+-- AlterEnum
+ALTER TYPE "ProviderType" ADD VALUE 'MISTRAL';
+ALTER TYPE "ProviderType" ADD VALUE 'GROQ';
+ALTER TYPE "ProviderType" ADD VALUE 'GITHUB';

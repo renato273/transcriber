@@ -82,7 +82,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     // 4. Decrypt API Key and translate
     const apiKey = decrypt(activeProvider.apiKey, ENCRYPTION_KEY);
-    const adapter = AIServiceFactory.createAdapter(activeProvider.type, apiKey);
+    const adapter = AIServiceFactory.createAdapter(
+      activeProvider.type,
+      apiKey,
+      activeProvider.baseUrl
+    );
 
     const translatedText = await adapter.translateText(transcription.originalText, targetLanguage);
 

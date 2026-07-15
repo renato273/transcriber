@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Upload, Trash2, Plus, Volume2, Globe, Check, AlertCircle, Loader } from 'lucide-react';
+import { Mic, Upload, Trash2, Plus, Volume2, Globe, AlertCircle, Loader, Cpu, RefreshCw } from 'lucide-react';
+import { toast, confirmDialog } from './alerts';
 
 export default function DashboardContent() {
   const [sessions, setSessions] = useState([]);
@@ -8,33 +9,34 @@ export default function DashboardContent() {
   const [transcriptions, setTranscriptions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [loadingTranscriptions, setLoadingTranscriptions] = useState(false);
-  
-  // Recording state
+
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [audioChunks, setAudioChunks] = useState([]);
   const timerRef = useRef(null);
 
-  // File Upload state
   const [uploadFile, setUploadFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  
-  // Translation state
+
+  const [providers, setProviders] = useState([]);
+  const [selectedProvider, setSelectedProvider] = useState('');
+  const [models, setModels] = useState([]);
+  const [selectedModel, setSelectedModel] = useState('');
+  const [loadingModels, setLoadingModels] = useState(false);
+
   const [translatingId, setTranslatingId] = useState(null);
-  const [targetLanguages, setTargetLanguages] = useState({}); // { transcriptionId: langCode }
+  const [deletingId, setDeletingId] = useState(null);
+  const [targetLanguages, setTargetLanguages] = useState({});
 
-  // Action states
   const [actionLoading, setActionLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [sessionsOpen, setSessionsOpen] = useState(true);
 
-  // Fetch all sessions on mount
   useEffect(() => {
     fetchSessions();
+    fetchProviders();
   }, []);
 
-  // Fetch transcriptions when activeSession changes
   useEffect(() => {
     if (activeSession) {
       fetchSessionDetails(activeSession.id);
@@ -43,7 +45,15 @@ export default function DashboardContent() {
     }
   }, [activeSession]);
 
-  // Recording Timer
+  useEffect(() => {
+    if (selectedProvider) {
+      fetchModels(selectedProvider);
+    } else {
+      setModels([]);
+      setSelectedModel('');
+    }
+  }, [selectedProvider]);
+
   useEffect(() => {
     if (isRecording && !isPaused) {
       timerRef.current = setInterval(() => {
@@ -54,6 +64,48 @@ export default function DashboardContent() {
     }
     return () => clearInterval(timerRef.current);
   }, [isRecording, isPaused]);
+
+  const fetchProviders = async () => {
+    try {
+      const res = await fetch('/api/providers?capability=transcription');
+      if (res.ok) {
+        const data = await res.json();
+        setProviders(data);
+        const defaultProv = data.find((p) => p.isDefaultTranscription) || data[0];
+        if (defaultProv) {
+          setSelectedProvider(defaultProv.type);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchModels = async (providerType) => {
+    setLoadingModels(true);
+    setModels([]);
+    setSelectedModel('');
+    try {
+      const res = await fetch(
+        `/api/providers/models?type=${encodeURIComponent(providerType)}&capability=transcription`
+      );
+      const data = await res.json();
+      if (res.ok) {
+        const list = data.models || [];
+        setModels(list);
+        if (list.length > 0) {
+          setSelectedModel(list[0].id);
+        }
+      } else {
+        toast.error(data.error || 'No se pudieron cargar los modelos free');
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Error al listar modelos del proveedor');
+    } finally {
+      setLoadingModels(false);
+    }
+  };
 
   const fetchSessions = async () => {
     setLoadingSessions(true);
@@ -75,7 +127,6 @@ export default function DashboardContent() {
 
   const fetchSessionDetails = async (id) => {
     setLoadingTranscriptions(true);
-    setErrorMsg('');
     try {
       const res = await fetch(`/api/sessions/${id}`);
       if (res.ok) {
@@ -83,7 +134,7 @@ export default function DashboardContent() {
         setTranscriptions(data.transcriptions || []);
       }
     } catch (e) {
-      setErrorMsg('Error al cargar grabaciones');
+      toast.error('Error al cargar grabaciones');
     } finally {
       setLoadingTranscriptions(false);
     }
@@ -104,15 +155,26 @@ export default function DashboardContent() {
         setSessions([newSession, ...sessions]);
         setActiveSession(newSession);
         setNewSessionTitle('');
+        toast.success('Sesión creada');
+      } else {
+        toast.error('No se pudo crear la sesión');
       }
     } catch (e) {
       console.error(e);
+      toast.error('Error al conectar con el servidor');
     }
   };
 
   const deleteSession = async (id, e) => {
     e.stopPropagation();
-    if (!confirm('¿Estás seguro de eliminar esta sesión y todas sus grabaciones?')) return;
+    const ok = await confirmDialog({
+      title: 'Eliminar sesión',
+      message: 'Se eliminarán todas las grabaciones y traducciones de esta sesión. Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
@@ -122,22 +184,57 @@ export default function DashboardContent() {
         if (activeSession?.id === id) {
           setActiveSession(remaining.length > 0 ? remaining[0] : null);
         }
+        toast.success('Sesión eliminada');
+      } else {
+        toast.error('No se pudo eliminar la sesión');
       }
     } catch (e) {
       console.error(e);
+      toast.error('Error al conectar con el servidor');
     }
   };
 
-  // --- RECORDING FUNCTIONS ---
+  const deleteTranscription = async (id) => {
+    const ok = await confirmDialog({
+      title: 'Eliminar transcripción',
+      message: 'Se eliminará el texto, las traducciones y el archivo de audio asociados.',
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/transcriptions/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        setTranscriptions((prev) => prev.filter((t) => t.id !== id));
+        toast.success('Transcripción eliminada');
+      } else {
+        toast.error(data.error || 'No se pudo eliminar la transcripción');
+      }
+    } catch (e) {
+      toast.error('Error al conectar con el servidor');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const startRecording = async () => {
-    setAudioChunks([]);
+    if (!selectedProvider) {
+      toast.error('Selecciona un proveedor de IA antes de grabar.');
+      return;
+    }
+    if (!selectedModel) {
+      toast.error('Selecciona un modelo free antes de grabar.');
+      return;
+    }
     setRecordingTime(0);
-    setErrorMsg('');
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      
+
       const chunks = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.push(e.data);
@@ -146,8 +243,6 @@ export default function DashboardContent() {
       recorder.onstop = async () => {
         const blob = new Blob(chunks, { type: 'audio/webm' });
         await handleAudioUpload(blob, 'grabacion.webm');
-        
-        // Stop all stream tracks to release microphone
         stream.getTracks().forEach(track => track.stop());
       };
 
@@ -156,7 +251,7 @@ export default function DashboardContent() {
       setIsRecording(true);
       setIsPaused(false);
     } catch (err) {
-      setErrorMsg('No se pudo acceder al micrófono. Verifica los permisos.');
+      toast.error('No se pudo acceder al micrófono. Verifica los permisos.');
     }
   };
 
@@ -180,7 +275,6 @@ export default function DashboardContent() {
     }
   };
 
-  // --- FILE UPLOAD FUNCTIONS ---
   const handleDragOver = (e) => {
     e.preventDefault();
     setIsDragging(true);
@@ -199,7 +293,7 @@ export default function DashboardContent() {
       if (file.type.startsWith('audio/')) {
         setUploadFile(file);
       } else {
-        setErrorMsg('Por favor, arrastra solo archivos de audio');
+        toast.error('Por favor, arrastra solo archivos de audio');
       }
     }
   };
@@ -213,8 +307,11 @@ export default function DashboardContent() {
 
   const submitFile = async () => {
     if (!uploadFile) return;
+    if (!selectedProvider || !selectedModel) {
+      toast.error('Selecciona proveedor y modelo free antes de transcribir.');
+      return;
+    }
     setActionLoading(true);
-    setErrorMsg('');
     try {
       await handleAudioUpload(uploadFile, uploadFile.name);
       setUploadFile(null);
@@ -225,16 +322,16 @@ export default function DashboardContent() {
     }
   };
 
-  // --- COMMMON UPLOAD/TRANSCRIBE LOGIC ---
   const handleAudioUpload = async (audioBlob, fileName) => {
     if (!activeSession) return;
     setActionLoading(true);
-    setErrorMsg('');
 
     const formData = new FormData();
     formData.append('audio', audioBlob, fileName);
     formData.append('sessionId', activeSession.id);
     formData.append('language', 'es');
+    if (selectedProvider) formData.append('providerType', selectedProvider);
+    if (selectedModel) formData.append('modelId', selectedModel);
 
     try {
       const res = await fetch('/api/transcribe', {
@@ -244,23 +341,21 @@ export default function DashboardContent() {
 
       const data = await res.json();
       if (res.ok) {
-        // Reload session details to include the new transcription
         await fetchSessionDetails(activeSession.id);
+        toast.success('Transcripción completada');
       } else {
-        setErrorMsg(data.error || 'Error al procesar la transcripción');
+        toast.error(data.error || data.details || 'Error al procesar la transcripción');
       }
     } catch (err) {
-      setErrorMsg('Error al conectar con el servidor');
+      toast.error('Error al conectar con el servidor');
     } finally {
       setActionLoading(false);
     }
   };
 
-  // --- TRANSLATION LOGIC ---
   const handleTranslate = async (transcriptionId) => {
     const lang = targetLanguages[transcriptionId] || 'en';
     setTranslatingId(transcriptionId);
-    setErrorMsg('');
 
     try {
       const res = await fetch('/api/translate', {
@@ -271,13 +366,13 @@ export default function DashboardContent() {
 
       const data = await res.json();
       if (res.ok) {
-        // Refresh session transcriptions to pull new translations list
         await fetchSessionDetails(activeSession.id);
+        toast.success('Traducción lista');
       } else {
-        setErrorMsg(data.error || 'Error al traducir');
+        toast.error(data.error || 'Error al traducir');
       }
     } catch (err) {
-      setErrorMsg('Error al conectar con el servidor');
+      toast.error('Error al conectar con el servidor');
     } finally {
       setTranslatingId(null);
     }
@@ -293,93 +388,165 @@ export default function DashboardContent() {
     return `${m}:${s}`;
   };
 
+  const providerLabel = (type) => {
+    const found = providers.find((p) => p.type === type);
+    return found?.label || type;
+  };
+
+  const canTranscribe = !!selectedProvider && !!selectedModel && !loadingModels;
+
   return (
-    <div class="flex-grow flex flex-col md:flex-row max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 gap-6 min-h-[calc(100vh-4rem)]">
-      
-      {/* SIDEBAR: SESSIONS LIST */}
-      <div class="w-full md:w-80 flex flex-col bg-[#151D30]/40 border border-[#1F293D] rounded-3xl p-5 shrink-0">
-        <h2 class="text-lg font-bold text-white mb-4 flex items-center justify-between">
-          <span>Mis Sesiones</span>
-          <Plus class="w-4 h-4 text-gray-400" />
-        </h2>
+    <div class="flex-grow flex flex-col lg:flex-row max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 gap-4 sm:gap-6 min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100vh-4rem)]">
 
-        <form onSubmit={createSession} class="flex gap-2 mb-6">
-          <input
-            type="text"
-            placeholder="Nueva sesión..."
-            value={newSessionTitle}
-            onChange={(e) => setNewSessionTitle(e.target.value)}
-            class="flex-grow px-3 py-2 text-sm bg-[#0E1524] border border-[#1F293D] rounded-xl focus:outline-none focus:ring-1 focus:ring-primary text-white"
-          />
-          <button
-            type="submit"
-            class="p-2 bg-primary hover:bg-primary-dark text-white rounded-xl transition-all"
-          >
-            <Plus class="w-4 h-4" />
-          </button>
-        </form>
+      {/* Sessions: collapsible on mobile, sidebar on desktop */}
+      <div class="w-full lg:w-72 xl:w-80 flex flex-col bg-[#151D30]/40 border border-[#1F293D] rounded-2xl sm:rounded-3xl p-3 sm:p-5 shrink-0">
+        <button
+          type="button"
+          onClick={() => setSessionsOpen((v) => !v)}
+          class="lg:pointer-events-none flex items-center justify-between w-full text-left"
+        >
+          <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            Mis Sesiones
+            <span class="text-[10px] font-normal text-gray-500 lg:hidden">
+              ({sessions.length})
+            </span>
+          </h2>
+          <span class={`lg:hidden text-gray-400 transition-transform ${sessionsOpen ? 'rotate-180' : ''}`}>
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </span>
+        </button>
 
-        <div class="flex-grow overflow-y-auto space-y-2 max-h-[300px] md:max-h-none">
-          {loadingSessions ? (
-            <div class="text-center py-8 text-gray-500 text-sm">Cargando sesiones...</div>
-          ) : sessions.length === 0 ? (
-            <div class="text-center py-8 text-gray-500 text-sm">No hay sesiones creadas</div>
-          ) : (
-            sessions.map((s) => (
-              <div
-                key={s.id}
-                onClick={() => setActiveSession(s)}
-                class={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer transition-all border ${
-                  activeSession?.id === s.id
-                    ? 'bg-primary/10 border-primary text-white font-medium shadow-md shadow-primary/5'
-                    : 'border-transparent text-gray-400 hover:bg-[#151D30] hover:text-white'
-                }`}
-              >
-                <span class="truncate text-sm pr-2">{s.title}</span>
-                <button
-                  onClick={(e) => deleteSession(s.id, e)}
-                  class="p-1 text-gray-500 hover:text-red-400 rounded transition-all"
+        <div class={`${sessionsOpen ? 'block' : 'hidden'} lg:block mt-3 sm:mt-4`}>
+          <form onSubmit={createSession} class="flex gap-2 mb-4 sm:mb-6">
+            <input
+              type="text"
+              placeholder="Nueva sesión..."
+              value={newSessionTitle}
+              onChange={(e) => setNewSessionTitle(e.target.value)}
+              class="flex-grow min-w-0 px-3 py-2.5 sm:py-2 text-sm bg-[#0E1524] border border-[#1F293D] rounded-xl focus:outline-none focus:ring-1 focus:ring-primary text-white"
+            />
+            <button
+              type="submit"
+              class="shrink-0 w-11 h-11 sm:w-auto sm:h-auto sm:p-2 bg-primary hover:bg-primary-dark text-white rounded-xl transition-all flex items-center justify-center"
+              aria-label="Crear sesión"
+            >
+              <Plus class="w-4 h-4" />
+            </button>
+          </form>
+
+          <div class="overflow-y-auto touch-scroll space-y-2 max-h-[40vh] lg:max-h-none lg:flex-grow">
+            {loadingSessions ? (
+              <div class="text-center py-6 text-gray-500 text-sm">Cargando sesiones...</div>
+            ) : sessions.length === 0 ? (
+              <div class="text-center py-6 text-gray-500 text-sm">No hay sesiones creadas</div>
+            ) : (
+              sessions.map((s) => (
+                <div
+                  key={s.id}
+                  onClick={() => {
+                    setActiveSession(s);
+                    setSessionsOpen(false);
+                  }}
+                  class={`flex items-center justify-between px-3 sm:px-4 py-3 rounded-2xl cursor-pointer transition-all border min-h-[48px] ${
+                    activeSession?.id === s.id
+                      ? 'bg-primary/10 border-primary text-white font-medium shadow-md shadow-primary/5'
+                      : 'border-transparent text-gray-400 hover:bg-[#151D30] hover:text-white'
+                  }`}
                 >
-                  <Trash2 class="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))
-          )}
+                  <span class="truncate text-sm pr-2">{s.title}</span>
+                  <button
+                    onClick={(e) => deleteSession(s.id, e)}
+                    class="p-2 text-gray-500 hover:text-red-400 rounded-lg transition-all shrink-0"
+                    aria-label="Eliminar sesión"
+                  >
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
 
-      {/* MAIN CONTAINER: TRANSCRIPTION WORKSPACE */}
-      <div class="flex-grow flex flex-col bg-[#151D30]/20 border border-[#1F293D] rounded-3xl p-6 min-w-0 relative">
+      <div class="flex-grow flex flex-col bg-[#151D30]/20 border border-[#1F293D] rounded-2xl sm:rounded-3xl p-3 sm:p-6 min-w-0 relative">
         {activeSession ? (
           <>
-            {/* Header of Active Session */}
-            <div class="border-b border-[#1F293D] pb-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h1 class="text-2xl font-bold text-white">{activeSession.title}</h1>
-                <p class="text-xs text-gray-400 font-mono mt-1">ID: {activeSession.id}</p>
-              </div>
-              
-              {/* Alert Notification */}
-              {errorMsg && (
-                <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-500/20 bg-red-950/20 text-red-400 text-xs">
-                  <AlertCircle class="w-3.5 h-3.5" />
-                  {errorMsg}
-                </div>
-              )}
+            <div class="border-b border-[#1F293D] pb-3 sm:pb-4 mb-4 sm:mb-6">
+              <h1 class="text-xl sm:text-2xl font-bold text-white break-words">{activeSession.title}</h1>
+              <p class="text-[10px] sm:text-xs text-gray-400 font-mono mt-1 truncate">ID: {activeSession.id}</p>
             </div>
 
-            {/* CONTROLS AREA: RECORDING AND UPLOADING CONTAINER */}
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              
-              {/* MICROPHONE RECORDING BOX */}
-              <div class="bg-[#151D30]/50 border border-[#1F293D] p-5 rounded-2xl flex flex-col items-center justify-center text-center relative overflow-hidden group">
+            <div class="mb-4 sm:mb-6 p-3 sm:p-4 bg-[#151D30]/50 border border-[#1F293D] rounded-2xl space-y-3">
+              <div class="flex flex-col gap-2 sm:gap-3">
+                <label class="flex items-center gap-2 text-sm text-white font-semibold">
+                  <Cpu class="w-4 h-4 text-primary shrink-0" />
+                  Proveedor
+                </label>
+                {providers.length === 0 ? (
+                  <p class="text-xs text-amber-400">
+                    No hay proveedores activos. Configúralos en administración.
+                  </p>
+                ) : (
+                  <select
+                    value={selectedProvider}
+                    onChange={(e) => setSelectedProvider(e.target.value)}
+                    disabled={actionLoading || isRecording}
+                    class="w-full min-w-0 bg-[#0E1524] border border-[#1F293D] rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                  >
+                    {providers.map((p) => (
+                      <option key={p.type} value={p.type}>
+                        {p.label || p.name}{p.isDefaultTranscription ? ' (default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div class="flex flex-col gap-2 sm:gap-3">
+                <label class="text-sm text-white font-semibold">Modelo free</label>
+                <div class="flex gap-2 min-w-0">
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    disabled={actionLoading || isRecording || loadingModels || models.length === 0}
+                    class="flex-grow min-w-0 bg-[#0E1524] border border-[#1F293D] rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                  >
+                    {loadingModels ? (
+                      <option value="">Cargando modelos...</option>
+                    ) : models.length === 0 ? (
+                      <option value="">Sin modelos free</option>
+                    ) : (
+                      models.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => selectedProvider && fetchModels(selectedProvider)}
+                    disabled={!selectedProvider || loadingModels || actionLoading || isRecording}
+                    title="Recargar modelos free"
+                    aria-label="Recargar modelos"
+                    class="shrink-0 w-11 h-11 flex items-center justify-center border border-[#1F293D] hover:bg-[#1E2942] rounded-xl text-gray-300 disabled:opacity-50"
+                  >
+                    <RefreshCw class={`w-4 h-4 ${loadingModels ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6 mb-6 sm:mb-8">
+              <div class="bg-[#151D30]/50 border border-[#1F293D] p-4 sm:p-5 rounded-2xl flex flex-col items-center justify-center text-center relative overflow-hidden group min-h-[160px]">
                 <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
                   <Mic class="w-4 h-4 text-primary" /> Grabación en Vivo
                 </h3>
 
                 {isRecording ? (
                   <div class="space-y-4 w-full">
-                    {/* Animated sound wave mimicking */}
                     <div class="flex justify-center items-center gap-1 h-12">
                       <div class="w-1 bg-primary rounded-full h-8 animate-pulse"></div>
                       <div class="w-1 bg-accent rounded-full h-12 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
@@ -390,16 +557,16 @@ export default function DashboardContent() {
 
                     <div class="text-2xl font-mono font-bold text-white">{formatTime(recordingTime)}</div>
 
-                    <div class="flex gap-2 justify-center">
+                    <div class="flex flex-col gap-2 sm:flex-row justify-center">
                       <button
                         onClick={pauseRecording}
-                        class="px-4 py-2 border border-[#1F293D] hover:bg-[#1E2942] rounded-xl text-xs text-gray-300 transition-all"
+                        class="min-h-[44px] px-4 py-2.5 border border-[#1F293D] hover:bg-[#1E2942] rounded-xl text-sm text-gray-300 transition-all"
                       >
                         {isPaused ? 'Reanudar' : 'Pausar'}
                       </button>
                       <button
                         onClick={stopRecording}
-                        class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-all shadow-md shadow-red-900/20"
+                        class="min-h-[44px] px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold transition-all shadow-md shadow-red-900/20"
                       >
                         Finalizar y Transcribir
                       </button>
@@ -408,47 +575,47 @@ export default function DashboardContent() {
                 ) : (
                   <button
                     onClick={startRecording}
-                    disabled={actionLoading}
+                    disabled={actionLoading || !canTranscribe}
                     class="w-16 h-16 rounded-full bg-primary hover:bg-primary-dark flex items-center justify-center text-white transition-all shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 disabled:opacity-50"
+                    aria-label="Iniciar grabación"
                   >
                     <Mic class="w-7 h-7" />
                   </button>
                 )}
                 {!isRecording && (
-                  <p class="text-xs text-gray-400 mt-4">Pulsa el botón para iniciar grabación con tu micrófono.</p>
+                  <p class="text-xs text-gray-400 mt-4 px-2">Pulsa para grabar con tu micrófono.</p>
                 )}
               </div>
 
-              {/* FILE UPLOAD BOX */}
               <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                class={`border p-5 rounded-2xl flex flex-col items-center justify-center text-center transition-all bg-[#151D30]/50 ${
+                class={`border p-4 sm:p-5 rounded-2xl flex flex-col items-center justify-center text-center transition-all bg-[#151D30]/50 min-h-[160px] ${
                   isDragging ? 'border-primary bg-primary/5' : 'border-[#1F293D]'
                 }`}
               >
                 <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                  <Upload class="w-4 h-4 text-accent" /> Cargar Archivo de Audio
+                  <Upload class="w-4 h-4 text-accent" /> Cargar Audio
                 </h3>
 
                 {uploadFile ? (
                   <div class="space-y-4 w-full">
-                    <div class="p-3 bg-[#0E1524] border border-[#1F293D] rounded-xl text-xs text-gray-300 truncate max-w-[250px] mx-auto">
+                    <div class="p-3 bg-[#0E1524] border border-[#1F293D] rounded-xl text-xs text-gray-300 truncate max-w-full mx-auto">
                       {uploadFile.name} ({(uploadFile.size / (1024 * 1024)).toFixed(2)} MB)
                     </div>
-                    <div class="flex gap-2 justify-center">
+                    <div class="flex flex-wrap gap-2 justify-center">
                       <button
                         onClick={() => setUploadFile(null)}
                         disabled={actionLoading}
-                        class="px-3 py-1.5 border border-[#1F293D] hover:bg-[#1E2942] rounded-lg text-xs text-gray-400 hover:text-white transition-all"
+                        class="min-h-[44px] px-4 py-2 border border-[#1F293D] hover:bg-[#1E2942] rounded-lg text-sm text-gray-400 hover:text-white transition-all"
                       >
                         Cancelar
                       </button>
                       <button
                         onClick={submitFile}
-                        disabled={actionLoading}
-                        class="px-4 py-1.5 bg-accent hover:bg-accent-dark text-white rounded-lg text-xs font-semibold transition-all"
+                        disabled={actionLoading || !canTranscribe}
+                        class="min-h-[44px] px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50"
                       >
                         Subir y Transcribir
                       </button>
@@ -456,56 +623,57 @@ export default function DashboardContent() {
                   </div>
                 ) : (
                   <div class="flex flex-col items-center">
-                    <label class="w-12 h-12 rounded-full border border-[#1F293D] bg-[#0B0F19] hover:bg-[#151D30] cursor-pointer flex items-center justify-center text-gray-400 hover:text-white transition-all mb-3">
+                    <label class="w-14 h-14 rounded-full border border-[#1F293D] bg-[#0B0F19] hover:bg-[#151D30] cursor-pointer flex items-center justify-center text-gray-400 hover:text-white transition-all mb-3 active:scale-95">
                       <Upload class="w-5 h-5" />
                       <input
                         type="file"
-                        accept="audio/*"
+                        accept="audio/*,.mp3,.wav,.m4a,.webm"
+                        capture="user"
                         onChange={handleFileSelect}
                         class="hidden"
                         disabled={actionLoading}
                       />
                     </label>
-                    <p class="text-xs text-gray-400">Arrastra tu archivo aquí o haz clic en el icono</p>
-                    <span class="text-[10px] text-gray-500 mt-1">Formatos soportados: MP3, WAV, M4A, WEBM</span>
+                    <p class="text-xs text-gray-400 px-2">Toca para elegir un archivo de audio</p>
+                    <span class="text-[10px] text-gray-500 mt-1">MP3, WAV, M4A, WEBM</span>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* LIST OF COMPLETED TRANSCRIPTIONS */}
-            <div class="flex-grow flex flex-col min-h-[300px]">
-              <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Volume2 class="w-4 h-4 text-gray-400" /> Grabaciones en esta sesión
+            <div class="flex-grow flex flex-col min-h-[240px]">
+              <h2 class="text-base sm:text-lg font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
+                <Volume2 class="w-4 h-4 text-gray-400" /> Grabaciones
               </h2>
 
               {loadingTranscriptions ? (
-                <div class="flex-grow flex items-center justify-center">
+                <div class="flex-grow flex items-center justify-center py-10">
                   <div class="text-center text-gray-500 space-y-2">
                     <div class="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
                     <div class="text-sm">Cargando transcripciones...</div>
                   </div>
                 </div>
               ) : transcriptions.length === 0 ? (
-                <div class="flex-grow border border-dashed border-[#1F293D] rounded-2xl flex items-center justify-center p-8 text-center text-gray-500 text-sm">
-                  Ningún audio transcrito todavía en esta sesión. ¡Empieza grabando o subiendo uno!
+                <div class="flex-grow border border-dashed border-[#1F293D] rounded-2xl flex items-center justify-center p-6 sm:p-8 text-center text-gray-500 text-sm">
+                  Ningún audio transcrito todavía. Graba o sube uno para empezar.
                 </div>
               ) : (
-                <div class="space-y-6 overflow-y-auto max-h-[500px] pr-2">
+                <div class="space-y-4 sm:space-y-6 overflow-y-auto touch-scroll max-h-[min(60vh,560px)] pr-0 sm:pr-2">
                   {transcriptions.map((t) => (
-                    <div key={t.id} class="p-5 bg-[#151D30]/40 border border-[#1F293D] rounded-2xl space-y-4">
-                      
-                      {/* Transcription Info header */}
-                      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#1F293D] pb-3 text-xs text-gray-400">
-                        <div class="flex items-center gap-3">
+                    <div key={t.id} class="p-3 sm:p-5 bg-[#151D30]/40 border border-[#1F293D] rounded-2xl space-y-3 sm:space-y-4">
+
+                      <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between border-b border-[#1F293D] pb-3 text-xs text-gray-400">
+                        <div class="flex flex-wrap items-center gap-2">
                           <span class="font-mono text-[10px] bg-[#0E1524] px-2 py-1 rounded border border-[#1F293D]">
-                            ID: {t.id.slice(0, 8)}...
+                            {t.id.slice(0, 8)}…
                           </span>
-                          <span>Fecha: {new Date(t.createdAt).toLocaleDateString()} {new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span class="text-[11px] sm:text-xs">
+                            {new Date(t.createdAt).toLocaleDateString()} {new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
                           <span class="px-2 py-0.5 bg-primary/10 border border-primary/20 text-primary-light rounded-md">
-                            IA: {t.providerUsed || 'Gemini'}
+                            {providerLabel(t.providerUsed) || t.providerUsed || 'N/A'}
                           </span>
                           <span class={`px-2 py-0.5 rounded-md ${
                             t.status === 'COMPLETED' ? 'bg-green-500/10 border border-green-500/20 text-green-400' :
@@ -515,34 +683,45 @@ export default function DashboardContent() {
                             {t.status === 'COMPLETED' ? 'Completado' :
                              t.status === 'FAILED' ? 'Fallido' : 'Procesando'}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => deleteTranscription(t.id)}
+                            disabled={deletingId === t.id}
+                            title="Eliminar transcripción"
+                            aria-label="Eliminar transcripción"
+                            class="p-2 text-gray-500 hover:text-red-400 hover:bg-red-950/30 rounded-lg transition-all disabled:opacity-50 ml-auto sm:ml-0"
+                          >
+                            {deletingId === t.id ? (
+                              <RefreshCw class="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 class="w-4 h-4" />
+                            )}
+                          </button>
                         </div>
                       </div>
 
-                      {/* Content Area */}
                       {t.status === 'FAILED' ? (
-                        <div class="text-sm text-red-400 bg-red-950/20 border border-red-900/30 p-3 rounded-xl flex items-start gap-2">
+                        <div class="text-sm text-red-400 bg-red-950/20 border border-red-900/30 p-3 rounded-xl flex items-start gap-2 break-words">
                           <AlertCircle class="w-4 h-4 shrink-0 mt-0.5" />
                           <span>Error: {t.errorMessage || 'No se pudo transcribir el audio'}</span>
                         </div>
                       ) : (
                         <div class="space-y-4">
-                          {/* Transcription text */}
                           <div>
-                            <span class="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1">Texto Original (es)</span>
-                            <p class="text-sm text-gray-200 bg-[#0E1524]/60 p-4 border border-[#1F293D]/50 rounded-xl leading-relaxed whitespace-pre-wrap">
+                            <span class="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1">Texto Original</span>
+                            <p class="text-sm text-gray-200 bg-[#0E1524]/60 p-3 sm:p-4 border border-[#1F293D]/50 rounded-xl leading-relaxed whitespace-pre-wrap break-words">
                               {t.originalText || 'Transcribiendo audio...'}
                             </p>
                           </div>
 
-                          {/* Translations List (if any) */}
                           {t.translations && t.translations.length > 0 && (
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 gap-3 sm:gap-4">
                               {t.translations.map((tr) => (
-                                <div key={tr.id} class="bg-[#151D30]/20 border border-[#1F293D]/50 p-4 rounded-xl">
+                                <div key={tr.id} class="bg-[#151D30]/20 border border-[#1F293D]/50 p-3 sm:p-4 rounded-xl">
                                   <span class="text-xs font-bold text-accent-light uppercase tracking-wider block mb-1">
                                     Traducción ({tr.targetLanguage.toUpperCase()})
                                   </span>
-                                  <p class="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+                                  <p class="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap break-words">
                                     {tr.translatedText}
                                   </p>
                                 </div>
@@ -550,37 +729,38 @@ export default function DashboardContent() {
                             </div>
                           )}
 
-                          {/* Translation Tool Trigger */}
                           {t.status === 'COMPLETED' && (
-                            <div class="flex items-center justify-end gap-3 border-t border-[#1F293D]/50 pt-3">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3 border-t border-[#1F293D]/50 pt-3">
                               <span class="text-xs text-gray-400 flex items-center gap-1">
-                                <Globe class="w-3.5 h-3.5" /> Traducir a:
+                                <Globe class="w-3.5 h-3.5" /> Traducir a
                               </span>
-                              <select
-                                value={targetLanguages[t.id] || 'en'}
-                                onChange={(e) => handleLangChange(t.id, e.target.value)}
-                                class="bg-[#0E1524] border border-[#1F293D] rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none"
-                              >
-                                <option value="en">Inglés (EN)</option>
-                                <option value="pt">Portugués (PT)</option>
-                                <option value="fr">Francés (FR)</option>
-                                <option value="de">Alemán (DE)</option>
-                                <option value="it">Italiano (IT)</option>
-                              </select>
-                              <button
-                                onClick={() => handleTranslate(t.id)}
-                                disabled={translatingId === t.id}
-                                class="px-3.5 py-1 bg-accent hover:bg-accent-dark text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-accent/10 disabled:opacity-50"
-                              >
-                                {translatingId === t.id ? (
-                                  <>
-                                    <div class="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
-                                    <span>Traduciendo...</span>
-                                  </>
-                                ) : (
-                                  <span>Traducir</span>
-                                )}
-                              </button>
+                              <div class="flex gap-2 min-w-0">
+                                <select
+                                  value={targetLanguages[t.id] || 'en'}
+                                  onChange={(e) => handleLangChange(t.id, e.target.value)}
+                                  class="flex-grow sm:flex-grow-0 min-w-0 bg-[#0E1524] border border-[#1F293D] rounded-lg px-2.5 py-2.5 text-sm text-white focus:outline-none"
+                                >
+                                  <option value="en">Inglés (EN)</option>
+                                  <option value="pt">Portugués (PT)</option>
+                                  <option value="fr">Francés (FR)</option>
+                                  <option value="de">Alemán (DE)</option>
+                                  <option value="it">Italiano (IT)</option>
+                                </select>
+                                <button
+                                  onClick={() => handleTranslate(t.id)}
+                                  disabled={translatingId === t.id}
+                                  class="shrink-0 min-h-[44px] px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-accent/10 disabled:opacity-50"
+                                >
+                                  {translatingId === t.id ? (
+                                    <>
+                                      <div class="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                                      <span>…</span>
+                                    </>
+                                  ) : (
+                                    <span>Traducir</span>
+                                  )}
+                                </button>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -593,19 +773,28 @@ export default function DashboardContent() {
             </div>
           </>
         ) : (
-          <div class="flex-grow flex flex-col items-center justify-center p-8 text-center text-gray-500">
-            <Volume2 class="w-16 h-16 text-gray-700 mb-4" />
+          <div class="flex-grow flex flex-col items-center justify-center p-6 sm:p-8 text-center text-gray-500">
+            <Volume2 class="w-12 h-12 sm:w-16 sm:h-16 text-gray-700 mb-4" />
             <h3 class="text-lg font-bold text-white mb-2">Comienza ahora</h3>
-            <p class="max-w-xs text-sm">Crea una nueva sesión en la barra lateral o selecciona una existente para empezar tus transcripciones.</p>
+            <p class="max-w-xs text-sm">Crea o selecciona una sesión para empezar a transcribir.</p>
+            <button
+              type="button"
+              onClick={() => setSessionsOpen(true)}
+              class="mt-4 lg:hidden min-h-[44px] px-4 py-2 rounded-xl border border-primary/30 bg-primary/10 text-primary-light text-sm font-medium"
+            >
+              Ver mis sesiones
+            </button>
           </div>
         )}
 
-        {/* Global Action overlay loaders */}
         {actionLoading && (
-          <div class="absolute inset-0 bg-[#0B0F19]/60 backdrop-blur-sm rounded-3xl flex items-center justify-center z-40">
+          <div class="absolute inset-0 bg-[#0B0F19]/70 backdrop-blur-sm rounded-2xl sm:rounded-3xl flex items-center justify-center z-40 p-4">
             <div class="text-center space-y-3">
               <Loader class="w-8 h-8 text-primary animate-spin mx-auto" />
-              <div class="text-sm font-semibold text-white">Procesando audio por IA...</div>
+              <div class="text-sm font-semibold text-white px-2">
+                Procesando con {providerLabel(selectedProvider) || 'IA'}
+                {selectedModel ? ` · ${selectedModel.split('/').pop()}` : ''}…
+              </div>
               <div class="text-xs text-gray-400">Esto puede tomar unos segundos.</div>
             </div>
           </div>

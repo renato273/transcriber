@@ -10,9 +10,9 @@ if (user) {
   <div class="flex-grow flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
     <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-accent/10 rounded-full blur-[100px] pointer-events-none"></div>
 
-    <div class="max-w-md w-full space-y-8 bg-[#151D30]/60 backdrop-blur-md border border-[#1F293D] p-8 sm:p-10 rounded-3xl z-10 relative">
+    <div class="max-w-md w-full space-y-8 bg-[#151D30]/60 backdrop-blur-md border border-[#1F293D] p-5 sm:p-10 rounded-2xl sm:rounded-3xl z-10 relative">
       <div>
-        <h2 class="text-center text-3xl font-extrabold text-white">
+        <h2 class="text-center text-2xl sm:text-3xl font-extrabold text-white">
           Crear una Cuenta
         </h2>
         <p class="mt-2 text-center text-sm text-gray-400">
@@ -83,8 +83,10 @@ if (user) {
       const password = (document.getElementById('password') as HTMLInputElement).value;
 
       if (password.length < 6) {
-        errorAlert.innerText = 'La contraseña debe tener al menos 6 caracteres';
+        const msg = 'La contraseña debe tener al menos 6 caracteres';
+        errorAlert.innerText = msg;
         errorAlert.classList.remove('hidden');
+        window.alerts?.toast.warning(msg);
         submitBtn.disabled = false;
         submitBtn.innerText = 'Registrarse';
         return;
@@ -102,18 +104,23 @@ if (user) {
         if (response.ok && data.success) {
           successAlert.innerText = 'Cuenta creada con éxito. Redirigiendo a inicio de sesión...';
           successAlert.classList.remove('hidden');
+          window.alerts?.toast.success('Cuenta creada con éxito');
           setTimeout(() => {
             window.location.href = '/login';
           }, 2000);
         } else {
-          errorAlert.innerText = data.error || 'Ocurrió un error inesperado';
+          const msg = data.error || 'Ocurrió un error inesperado';
+          errorAlert.innerText = msg;
           errorAlert.classList.remove('hidden');
+          window.alerts?.toast.error(msg);
           submitBtn.disabled = false;
           submitBtn.innerText = 'Registrarse';
         }
       } catch (err) {
-        errorAlert.innerText = 'Error al conectar con el servidor';
+        const msg = 'Error al conectar con el servidor';
+        errorAlert.innerText = msg;
         errorAlert.classList.remove('hidden');
+        window.alerts?.toast.error(msg);
         submitBtn.disabled = false;
         submitBtn.innerText = 'Registrarse';
       }

@@ -1,5 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, Key, Save, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Settings, Shield, Key, Save, RefreshCw } from 'lucide-react';
+import { toast } from './alerts';
+
+const PROVIDER_DEFS = [
+  {
+    type: 'GOOGLE',
+    name: 'Google Gemini',
+    supportsTranscription: true,
+    placeholder: 'AIzaSy...',
+  },
+  {
+    type: 'NVIDIA',
+    name: 'NVIDIA NIM (Whisper)',
+    supportsTranscription: true,
+    placeholder: 'nvapi-...',
+  },
+  {
+    type: 'OPENROUTER',
+    name: 'OpenRouter (solo traducción)',
+    supportsTranscription: false,
+    placeholder: 'sk-or-...',
+  },
+  {
+    type: 'MISTRAL',
+    name: 'Mistral AI (Voxtral)',
+    supportsTranscription: true,
+    placeholder: 'API key de console.mistral.ai',
+  },
+  {
+    type: 'GROQ',
+    name: 'Groq (Whisper)',
+    supportsTranscription: true,
+    placeholder: 'gsk_...',
+  },
+  {
+    type: 'GITHUB',
+    name: 'GitHub Models',
+    supportsTranscription: true,
+    placeholder: 'ghp_... (PAT con models:read)',
+  },
+];
 
 export default function AdminContent() {
   const [providers, setProviders] = useState([]);
@@ -7,17 +47,15 @@ export default function AdminContent() {
     audio_retention_days: '7'
   });
   const [loading, setLoading] = useState(true);
-  const [savingProvider, setSavingProvider] = useState(null); // type
+  const [savingProvider, setSavingProvider] = useState(null);
   const [savingSettings, setSavingSettings] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-
-  // Form values for providers keys
-  const [apiKeys, setApiKeys] = useState({
-    GOOGLE: '',
-    NVIDIA: '',
-    OPENROUTER: ''
-  });
+    
+  const [apiKeys, setApiKeys] = useState(
+    Object.fromEntries(PROVIDER_DEFS.map((p) => [p.type, '']))
+  );
+  const [baseUrls, setBaseUrls] = useState(
+    Object.fromEntries(PROVIDER_DEFS.map((p) => [p.type, '']))
+  );
 
   useEffect(() => {
     fetchData();
@@ -25,107 +63,124 @@ export default function AdminContent() {
 
   const fetchData = async () => {
     setLoading(true);
-    setErrorMsg('');
     try {
-      // 1. Fetch AI Providers
       const provRes = await fetch('/api/admin/providers');
       if (provRes.ok) {
         const provData = await provRes.json();
         setProviders(provData);
-        
-        // Initialize keys object with '********' if key is set in DB
+
         const keysMap = {};
-        provData.forEach(p => {
+        const urlsMap = {};
+        provData.forEach((p) => {
           keysMap[p.type] = p.apiKey || '';
+          urlsMap[p.type] = p.baseUrl || '';
         });
-        setApiKeys(prev => ({ ...prev, ...keysMap }));
+        setApiKeys((prev) => ({ ...prev, ...keysMap }));
+        setBaseUrls((prev) => ({ ...prev, ...urlsMap }));
       } else {
-        setErrorMsg('Error al cargar proveedores de IA.');
+        toast.error('Error al cargar proveedores de IA.');
       }
 
-      // 2. Fetch General Settings
       const setRes = await fetch('/api/admin/settings');
       if (setRes.ok) {
         const setData = await setRes.json();
-        setSettings(prev => ({ ...prev, ...setData }));
+        setSettings((prev) => ({ ...prev, ...setData }));
       }
     } catch (e) {
-      setErrorMsg('Error al conectar con la base de datos.');
+      toast.error('Error al conectar con la base de datos.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleKeyChange = (providerType, value) => {
-    setApiKeys(prev => ({ ...prev, [providerType]: value }));
+    setApiKeys((prev) => ({ ...prev, [providerType]: value }));
   };
 
   const saveProvider = async (type) => {
     setSavingProvider(type);
-    setErrorMsg('');
-    setSuccessMsg('');
 
-    const providerObj = providers.find(p => p.type === type) || {
+    const def = PROVIDER_DEFS.find((p) => p.type === type);
+    const providerObj = providers.find((p) => p.type === type) || {
       type,
-      name: type === 'GOOGLE' ? 'Google Gemini Free' : type === 'NVIDIA' ? 'Nvidia Whisper NIM' : 'OpenRouter Free LLM',
+      name: def?.name || type,
       isActive: false,
       isDefaultTranscription: false,
-      isDefaultTranslation: false
+      isDefaultTranslation: false,
     };
 
     const payload = {
       type,
-      name: providerObj.name,
+      name: providerObj.name || def?.name || type,
       apiKey: apiKeys[type],
+      baseUrl: baseUrls[type] || null,
       isActive: providerObj.isActive,
       isDefaultTranscription: providerObj.isDefaultTranscription,
-      isDefaultTranslation: providerObj.isDefaultTranslation
+      isDefaultTranslation: providerObj.isDefaultTranslation,
     };
 
     try {
       const res = await fetch('/api/admin/providers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setSuccessMsg(`Proveedor ${type} actualizado con éxito.`);
-        await fetchData(); // Reload to refresh defaults and key status
+        toast.success(`Proveedor ${type} actualizado con éxito.`);
+        await fetchData();
       } else {
-        setErrorMsg(data.error || 'Error al guardar proveedor');
+        toast.error(data.error || 'Error al guardar proveedor');
       }
     } catch (e) {
-      setErrorMsg('Error al conectar con el servidor.');
+      toast.error('Error al conectar con el servidor.');
     } finally {
       setSavingProvider(null);
     }
   };
 
   const toggleProviderBoolean = (type, field) => {
-    setProviders(prev => prev.map(p => {
-      if (p.type === type) {
-        return { ...p, [field]: !p[field] };
+    setProviders((prev) => {
+      const existing = prev.find((p) => p.type === type);
+      const def = PROVIDER_DEFS.find((p) => p.type === type);
+
+      if (!existing) {
+        const created = {
+          type,
+          name: def?.name || type,
+          isActive: field === 'isActive',
+          isDefaultTranscription: field === 'isDefaultTranscription',
+          isDefaultTranslation: field === 'isDefaultTranslation',
+        };
+        return [
+          ...prev.map((p) =>
+            field.startsWith('isDefault') ? { ...p, [field]: false } : p
+          ),
+          created,
+        ];
       }
-      // If we are setting default transcription/translation to true, set others to false
-      if (field.startsWith('isDefault') && !p[field] && p.type !== type) {
-        return { ...p, [field]: false };
-      }
-      return p;
-    }));
+
+      return prev.map((p) => {
+        if (p.type === type) {
+          return { ...p, [field]: !p[field] };
+        }
+        if (field.startsWith('isDefault') && p[field]) {
+          return { ...p, [field]: false };
+        }
+        return p;
+      });
+    });
   };
 
   const handleSettingsChange = (e) => {
     const { name, value } = e.target;
-    setSettings(prev => ({ ...prev, [name]: value }));
+    setSettings((prev) => ({ ...prev, [name]: value }));
   };
 
   const saveSettings = async (e) => {
     e.preventDefault();
     setSavingSettings(true);
-    setErrorMsg('');
-    setSuccessMsg('');
 
     try {
       const res = await fetch('/api/admin/settings', {
@@ -133,17 +188,17 @@ export default function AdminContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           key: 'audio_retention_days',
-          value: settings.audio_retention_days
-        })
+          value: settings.audio_retention_days,
+        }),
       });
 
       if (res.ok) {
-        setSuccessMsg('Configuraciones generales guardadas con éxito.');
+        toast.success('Configuraciones generales guardadas con éxito.');
       } else {
-        setErrorMsg('Error al guardar configuraciones.');
+        toast.error('Error al guardar configuraciones.');
       }
     } catch (e) {
-      setErrorMsg('Error al conectar con el servidor.');
+      toast.error('Error al conectar con el servidor.');
     } finally {
       setSavingSettings(false);
     }
@@ -161,64 +216,46 @@ export default function AdminContent() {
   }
 
   return (
-    <div class="max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8 min-h-[calc(100vh-4rem)] flex flex-col justify-start">
-      
-      {/* Page Header */}
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-[#1F293D] pb-5 gap-4">
+    <div class="max-w-4xl w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100vh-4rem)] flex flex-col justify-start">
+
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-[#1F293D] pb-4 sm:pb-5 gap-3 sm:gap-4">
         <div>
-          <h1 class="text-3xl font-extrabold text-white flex items-center gap-2">
-            <Shield class="w-8 h-8 text-accent" /> Panel de Administración
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-white flex items-center gap-2">
+            <Shield class="w-7 h-7 sm:w-8 sm:h-8 text-accent shrink-0" />
+            <span class="leading-tight">Panel de Administración</span>
           </h1>
-          <p class="text-sm text-gray-400 mt-1">Configura credenciales de IA y parámetros de limpieza de almacenamiento local.</p>
+          <p class="text-sm text-gray-400 mt-1.5 sm:mt-1">Configura credenciales de IA y parámetros de limpieza de almacenamiento local.</p>
         </div>
       </div>
 
-      {/* Notifications */}
-      {successMsg && (
-        <div class="p-4 rounded-2xl bg-green-950/30 border border-green-900/30 text-green-400 text-sm flex items-center gap-2">
-          <CheckCircle class="w-4 h-4 shrink-0" />
-          <span>{successMsg}</span>
-        </div>
-      )}
-      {errorMsg && (
-        <div class="p-4 rounded-2xl bg-red-950/30 border border-red-900/30 text-red-400 text-sm flex items-center gap-2">
-          <AlertCircle class="w-4 h-4 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-        {/* COL 1 & 2: PROVIDERS LIST */}
-        <div class="md:col-span-2 space-y-6">
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <Key class="w-5 h-5 text-gray-400" /> Proveedores de IA Gratuitos
+        <div class="md:col-span-2 space-y-4 sm:space-y-6">
+          <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            <Key class="w-5 h-5 text-gray-400 shrink-0" /> Proveedores de IA
           </h2>
 
-          {['GOOGLE', 'NVIDIA', 'OPENROUTER'].map((type) => {
-            const provider = providers.find(p => p.type === type) || {
-              type,
-              name: type === 'GOOGLE' ? 'Google Gemini Free' : type === 'NVIDIA' ? 'Nvidia Whisper NIM' : 'OpenRouter Free LLM',
+          {PROVIDER_DEFS.map((def) => {
+            const provider = providers.find((p) => p.type === def.type) || {
+              type: def.type,
+              name: def.name,
               isActive: false,
               isDefaultTranscription: false,
-              isDefaultTranslation: false
+              isDefaultTranslation: false,
             };
 
-            const isGemini = type === 'GOOGLE';
-            const isNvidia = type === 'NVIDIA';
-
             return (
-              <div key={type} class="p-6 bg-[#151D30]/40 border border-[#1F293D] rounded-2xl space-y-5">
-                <div class="flex items-center justify-between border-b border-[#1F293D] pb-3">
-                  <div>
-                    <h3 class="text-md font-bold text-white">{provider.name}</h3>
-                    <span class="text-[10px] text-gray-500 font-mono">{type}</span>
+              <div key={def.type} class="p-4 sm:p-6 bg-[#151D30]/40 border border-[#1F293D] rounded-2xl space-y-4 sm:space-y-5">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-[#1F293D] pb-3">
+                  <div class="min-w-0">
+                    <h3 class="text-md font-bold text-white break-words">{def.name}</h3>
+                    <span class="text-[10px] text-gray-500 font-mono">{def.type}</span>
                   </div>
-                  <label class="relative inline-flex items-center cursor-pointer">
+                  <label class="relative inline-flex items-center cursor-pointer self-start sm:self-auto">
                     <input
                       type="checkbox"
-                      checked={provider.isActive}
-                      onChange={() => toggleProviderBoolean(type, 'isActive')}
+                      checked={!!provider.isActive}
+                      onChange={() => toggleProviderBoolean(def.type, 'isActive')}
                       class="sr-only peer"
                     />
                     <div class="w-9 h-5 bg-[#0E1524] rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary peer-checked:after:bg-white"></div>
@@ -227,27 +264,44 @@ export default function AdminContent() {
                 </div>
 
                 <div class="space-y-4">
-                  {/* API Key Input */}
                   <div>
                     <label class="block text-xs font-medium text-gray-400 mb-1.5">API Key</label>
                     <input
                       type="password"
-                      value={apiKeys[type]}
-                      onChange={(e) => handleKeyChange(type, e.target.value)}
-                      placeholder="AIzaSy... o similar"
+                      value={apiKeys[def.type] || ''}
+                      onChange={(e) => handleKeyChange(def.type, e.target.value)}
+                      placeholder={def.placeholder}
                       class="w-full px-3 py-2.5 text-sm bg-[#0E1524] border border-[#1F293D] rounded-xl focus:outline-none focus:ring-1 focus:ring-primary text-white"
                     />
                   </div>
 
-                  {/* Defaults toggles */}
+                  {def.type === 'NVIDIA' && (
+                    <div>
+                      <label class="block text-xs font-medium text-gray-400 mb-1.5">
+                        Base URL NIM (opcional, autohospedado)
+                      </label>
+                      <input
+                        type="url"
+                        value={baseUrls[def.type] || ''}
+                        onChange={(e) =>
+                          setBaseUrls((prev) => ({ ...prev, [def.type]: e.target.value }))
+                        }
+                        placeholder="http://localhost:9000/v1"
+                        class="w-full px-3 py-2.5 text-sm bg-[#0E1524] border border-[#1F293D] rounded-xl focus:outline-none focus:ring-1 focus:ring-primary text-white"
+                      />
+                      <p class="text-[10px] text-gray-500 mt-1.5 leading-relaxed">
+                        Vacío = API cloud oficial (integrate.api.nvidia.com/chat con modelos multimodales). Solo usa Base URL si tienes un contenedor NIM ASR local (ej. http://localhost:9000/v1).
+                      </p>
+                    </div>
+                  )}
+
                   <div class="flex flex-wrap gap-4 pt-2">
-                    {/* Only show transcription default for Gemini/Nvidia NIM */}
-                    {(isGemini || isNvidia) && (
+                    {def.supportsTranscription && (
                       <label class="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={provider.isDefaultTranscription}
-                          onChange={() => toggleProviderBoolean(type, 'isDefaultTranscription')}
+                          checked={!!provider.isDefaultTranscription}
+                          onChange={() => toggleProviderBoolean(def.type, 'isDefaultTranscription')}
                           class="rounded bg-[#0E1524] border-[#1F293D] text-primary focus:ring-0 focus:ring-offset-0"
                         />
                         <span class="text-xs text-gray-300">Default para Transcripción</span>
@@ -257,8 +311,8 @@ export default function AdminContent() {
                     <label class="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={provider.isDefaultTranslation}
-                        onChange={() => toggleProviderBoolean(type, 'isDefaultTranslation')}
+                        checked={!!provider.isDefaultTranslation}
+                        onChange={() => toggleProviderBoolean(def.type, 'isDefaultTranslation')}
                         class="rounded bg-[#0E1524] border-[#1F293D] text-primary focus:ring-0 focus:ring-offset-0"
                       />
                       <span class="text-xs text-gray-300">Default para Traducción</span>
@@ -266,13 +320,13 @@ export default function AdminContent() {
                   </div>
                 </div>
 
-                <div class="flex justify-end pt-2">
+                <div class="flex justify-stretch sm:justify-end pt-2">
                   <button
-                    onClick={() => saveProvider(type)}
-                    disabled={savingProvider === type}
-                    class="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
+                    onClick={() => saveProvider(def.type)}
+                    disabled={savingProvider === def.type}
+                    class="w-full sm:w-auto min-h-[44px] px-4 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
                   >
-                    {savingProvider === type ? (
+                    {savingProvider === def.type ? (
                       <>
                         <RefreshCw class="w-3.5 h-3.5 animate-spin" />
                         <span>Guardando...</span>
@@ -290,13 +344,12 @@ export default function AdminContent() {
           })}
         </div>
 
-        {/* COL 3: GENERAL SETTINGS */}
-        <div class="space-y-6">
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <Settings class="w-5 h-5 text-gray-400" /> Ajustes del Sistema
+        <div class="space-y-4 sm:space-y-6">
+          <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            <Settings class="w-5 h-5 text-gray-400 shrink-0" /> Ajustes del Sistema
           </h2>
 
-          <form onSubmit={saveSettings} class="p-6 bg-[#151D30]/40 border border-[#1F293D] rounded-2xl space-y-5">
+          <form onSubmit={saveSettings} class="p-4 sm:p-6 bg-[#151D30]/40 border border-[#1F293D] rounded-2xl space-y-5">
             <div>
               <label class="block text-xs font-medium text-gray-400 mb-1.5">
                 Retención de Audios (Días)
@@ -308,7 +361,7 @@ export default function AdminContent() {
                 onChange={handleSettingsChange}
                 min="1"
                 max="90"
-                class="w-full px-3 py-2 text-sm bg-[#0E1524] border border-[#1F293D] rounded-xl focus:outline-none focus:ring-1 focus:ring-primary text-white"
+                class="w-full px-3 py-2.5 text-sm bg-[#0E1524] border border-[#1F293D] rounded-xl focus:outline-none focus:ring-1 focus:ring-primary text-white"
               />
               <p class="text-[10px] text-gray-500 mt-2 leading-relaxed">
                 Los archivos de audio subidos o grabados se eliminarán físicamente del disco del servidor después de estos días para conservar almacenamiento. Los registros de texto son permanentes.
@@ -318,7 +371,7 @@ export default function AdminContent() {
             <button
               type="submit"
               disabled={savingSettings}
-              class="w-full py-2 bg-accent hover:bg-accent-dark text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+              class="w-full min-h-[44px] py-2.5 bg-accent hover:bg-accent-dark text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
             >
               {savingSettings ? (
                 <>

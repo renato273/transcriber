@@ -10,3 +10,17 @@ declare namespace App {
     } | null;
   }
 }
+
+interface AlertsApi {
+  toast: {
+    success: (message: string, options?: Record<string, unknown>) => number;
+    error: (message: string, options?: Record<string, unknown>) => number;
+    warning: (message: string, options?: Record<string, unknown>) => number;
+    info: (message: string, options?: Record<string, unknown>) => number;
+  };
+  confirm: (options: string | Record<string, unknown>) => Promise<boolean>;
+}
+
+interface Window {
+  alerts?: AlertsApi;
+}

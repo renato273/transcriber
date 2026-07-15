@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { prisma, decrypt } from '@transcriber/database';
-import { AIServiceFactory } from '@transcriber/ai-services';
+import { AIServiceFactory, PROVIDER_CAPABILITIES } from '@transcriber/ai-services';
 import fs from 'fs';
 import path from 'path';
 
@@ -21,6 +21,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const audioFile = formData.get('audio') as File | null;
     const sessionId = formData.get('sessionId') as string | null;
     const inputLanguage = (formData.get('language') as string | null) || 'es';
+    const providerType = (formData.get('providerType') as string | null)?.toUpperCase() || null;
+    const modelId = (formData.get('modelId') as string | null)?.trim() || null;
 
     if (!audioFile || !sessionId) {
       return new Response(JSON.stringify({ error: 'Faltan datos de audio o sessionId' }), {
@@ -29,7 +31,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    // 1. Validate session ownership
     const session = await prisma.transcriptionSession.findFirst({
       where: {
         id: sessionId,
@@ -44,29 +45,56 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    // 2. Fetch the active transcription provider
-    const activeProvider = await prisma.aIProvider.findFirst({
-      where: {
-        isActive: true,
-        isDefaultTranscription: true
-      }
-    });
+    let activeProvider = null;
 
-    if (!activeProvider) {
-      return new Response(JSON.stringify({ 
-        error: 'No hay ningún proveedor de IA activo configurado para transcripción. Contacta al administrador.' 
-      }), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json' }
+    if (providerType) {
+      const caps = PROVIDER_CAPABILITIES[providerType];
+      if (!caps?.supportsTranscription) {
+        return new Response(JSON.stringify({
+          error: `El proveedor ${providerType} no soporta transcripción de audio.`
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      activeProvider = await prisma.aIProvider.findFirst({
+        where: {
+          type: providerType as any,
+          isActive: true,
+        }
       });
+
+      if (!activeProvider) {
+        return new Response(JSON.stringify({
+          error: `El proveedor ${providerType} no está activo o no tiene API key configurada.`
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    } else {
+      activeProvider = await prisma.aIProvider.findFirst({
+        where: {
+          isActive: true,
+          isDefaultTranscription: true
+        }
+      });
+
+      if (!activeProvider) {
+        return new Response(JSON.stringify({
+          error: 'No hay ningún proveedor de IA activo configurado para transcripción. Contacta al administrador.'
+        }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
     }
 
-    // 3. Ensure storage directory exists
     if (!fs.existsSync(STORAGE_DIR)) {
       fs.mkdirSync(STORAGE_DIR, { recursive: true });
     }
 
-    // 4. Save file to disk
     const fileExtension = audioFile.name ? path.extname(audioFile.name) : '.webm';
     const fileName = `${user.id}_${sessionId}_${Date.now()}${fileExtension}`;
     const filePath = path.join(STORAGE_DIR, fileName);
@@ -74,7 +102,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const buffer = Buffer.from(await audioFile.arrayBuffer());
     fs.writeFileSync(filePath, buffer);
 
-    // 5. Create draft in database
     const dbTranscription = await prisma.transcription.create({
       data: {
         sessionId: session.id,
@@ -85,16 +112,18 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
     });
 
-    // 6. Decrypt API key and transcribe
     let text = '';
     try {
       const apiKey = decrypt(activeProvider.apiKey, ENCRYPTION_KEY);
-      const adapter = AIServiceFactory.createAdapter(activeProvider.type, apiKey);
-      
-      const mimeType = audioFile.type || 'audio/webm';
-      text = await adapter.transcribeAudio(filePath, mimeType);
+      const adapter = AIServiceFactory.createAdapter(
+        activeProvider.type,
+        apiKey,
+        activeProvider.baseUrl
+      );
 
-      // Update success in DB
+      const mimeType = audioFile.type || 'audio/webm';
+      text = await adapter.transcribeAudio(filePath, mimeType, modelId || undefined);
+
       await prisma.transcription.update({
         where: { id: dbTranscription.id },
         data: {
@@ -104,8 +133,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     } catch (apiError: any) {
       console.error("Error durante llamada a proveedor de IA:", apiError);
-      
-      // Update fail status in DB
+
       await prisma.transcription.update({
         where: { id: dbTranscription.id },
         data: {
@@ -114,9 +142,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
         }
       });
 
-      return new Response(JSON.stringify({ 
-        error: 'Falló el servicio de transcripción de IA', 
-        details: apiError.message 
+      return new Response(JSON.stringify({
+        error: 'Falló el servicio de transcripción de IA',
+        details: apiError.message
       }), {
         status: 502,
         headers: { 'Content-Type': 'application/json' }
@@ -130,7 +158,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
         status: 'COMPLETED',
         originalText: text,
         language: inputLanguage,
-        providerUsed: activeProvider.type
+        providerUsed: activeProvider.type,
+        modelId: modelId || null,
       }
     }), {
       status: 200,
