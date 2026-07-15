@@ -183,6 +183,14 @@ const user = Astro.locals.user;
     overscroll-behavior: contain;
   }
 
+  /* Reproductor de audio en tema oscuro */
+  audio {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0.75rem;
+    outline: none;
+  }
+
   @keyframes alertSlideIn {
     from { opacity: 0; transform: translateY(-12px); }
     to { opacity: 1; transform: translateY(0); }

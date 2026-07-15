@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Upload, Trash2, Plus, Volume2, Globe, AlertCircle, Loader, Cpu, RefreshCw } from 'lucide-react';
+import { Mic, Upload, Trash2, Plus, Volume2, Globe, AlertCircle, Loader, Cpu, RefreshCw, Play } from 'lucide-react';
 import { toast, confirmDialog } from './alerts';
 
 export default function DashboardContent() {
@@ -701,12 +701,45 @@ export default function DashboardContent() {
                       </div>
 
                       {t.status === 'FAILED' ? (
-                        <div class="text-sm text-red-400 bg-red-950/20 border border-red-900/30 p-3 rounded-xl flex items-start gap-2 break-words">
-                          <AlertCircle class="w-4 h-4 shrink-0 mt-0.5" />
-                          <span>Error: {t.errorMessage || 'No se pudo transcribir el audio'}</span>
+                        <div class="space-y-3">
+                          <div class="text-sm text-red-400 bg-red-950/20 border border-red-900/30 p-3 rounded-xl flex items-start gap-2 break-words">
+                            <AlertCircle class="w-4 h-4 shrink-0 mt-0.5" />
+                            <span>Error: {t.errorMessage || 'No se pudo transcribir el audio'}</span>
+                          </div>
+                          {t.hasAudio && (
+                            <div class="bg-[#0E1524]/60 border border-[#1F293D]/50 rounded-xl p-3">
+                              <span class="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                                <Play class="w-3.5 h-3.5" /> Audio original
+                              </span>
+                              <audio
+                                controls
+                                preload="metadata"
+                                class="w-full h-10 accent-primary"
+                                src={`/api/transcriptions/${t.id}/audio`}
+                              >
+                                Tu navegador no soporta audio.
+                              </audio>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div class="space-y-4">
+                          {t.hasAudio && (
+                            <div class="bg-[#0E1524]/60 border border-[#1F293D]/50 rounded-xl p-3">
+                              <span class="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                                <Play class="w-3.5 h-3.5" /> Audio original
+                              </span>
+                              <audio
+                                controls
+                                preload="metadata"
+                                class="w-full h-10 accent-primary"
+                                src={`/api/transcriptions/${t.id}/audio`}
+                              >
+                                Tu navegador no soporta audio.
+                              </audio>
+                            </div>
+                          )}
+
                           <div>
                             <span class="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1">Texto Original</span>
                             <p class="text-sm text-gray-200 bg-[#0E1524]/60 p-3 sm:p-4 border border-[#1F293D]/50 rounded-xl leading-relaxed whitespace-pre-wrap break-words">
