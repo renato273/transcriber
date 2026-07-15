@@ -1,0 +1,107 @@
+---
+import Layout from '../layouts/Layout.astro';
+const user = Astro.locals.user;
+if (user) {
+  return Astro.redirect('/dashboard');
+}
+---
+
+<Layout title="Iniciar Sesión">
+  <div class="flex-grow flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-primary/10 rounded-full blur-[100px] pointer-events-none"></div>
+
+    <div class="max-w-md w-full space-y-8 bg-[#151D30]/60 backdrop-blur-md border border-[#1F293D] p-8 sm:p-10 rounded-3xl z-10 relative">
+      <div>
+        <h2 class="text-center text-3xl font-extrabold text-white">
+          Bienvenido de nuevo
+        </h2>
+        <p class="mt-2 text-center text-sm text-gray-400">
+          ¿No tienes una cuenta?
+          <a href="/register" class="font-medium text-primary hover:text-primary-light transition-colors">
+            Regístrate aquí
+          </a>
+        </p>
+      </div>
+
+      <form id="loginForm" class="mt-8 space-y-6">
+        <div id="errorAlert" class="hidden p-4 rounded-xl bg-red-950/40 border border-red-900/30 text-red-400 text-sm">
+        </div>
+
+        <div class="rounded-md shadow-sm space-y-4">
+          <div>
+            <label for="email" class="block text-sm font-medium text-gray-300 mb-1.5">Correo Electrónico</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-[#1F293D] bg-[#0E1524] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all sm:text-sm"
+              placeholder="tu@correo.com"
+            />
+          </div>
+          <div>
+            <label for="password" class="block text-sm font-medium text-gray-300 mb-1.5">Contraseña</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-[#1F293D] bg-[#0E1524] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all sm:text-sm"
+              placeholder="••••••••"
+            />
+          </div>
+        </div>
+
+        <div>
+          <button
+            type="submit"
+            id="submitBtn"
+            class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-primary to-primary-dark hover:from-primary-dark hover:to-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0B0F19] focus:ring-primary transition-all shadow-lg shadow-primary/10 hover:shadow-primary/20"
+          >
+            Iniciar Sesión
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm') as HTMLFormElement;
+    const errorAlert = document.getElementById('errorAlert') as HTMLDivElement;
+    const submitBtn = document.getElementById('submitBtn') as HTMLButtonElement;
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      errorAlert.classList.add('hidden');
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Cargando...';
+
+      const email = (document.getElementById('email') as HTMLInputElement).value;
+      const password = (document.getElementById('password') as HTMLInputElement).value;
+
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          window.location.href = '/dashboard';
+        } else {
+          errorAlert.innerText = data.error || 'Ocurrió un error inesperado';
+          errorAlert.classList.remove('hidden');
+        }
+      } catch (err) {
+        errorAlert.innerText = 'Error al conectar con el servidor';
+        errorAlert.classList.remove('hidden');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Iniciar Sesión';
+      }
+    });
+  </script>
+</Layout>

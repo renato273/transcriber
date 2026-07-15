@@ -1,0 +1,20 @@
+---
+import Layout from '../layouts/Layout.astro';
+import DashboardContent from '../components/DashboardContent';
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect('/login');
+}
+---
+
+<Layout title="Mi Panel de Control">
+  <div class="relative min-h-[calc(100vh-4rem)] flex flex-col bg-[#0B0F19]">
+    {/* Background glow effects */}
+    <div class="absolute top-10 left-10 w-[200px] h-[200px] bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-10 right-10 w-[200px] h-[200px] bg-accent/5 rounded-full blur-3xl pointer-events-none"></div>
+
+    {/* Content */}
+    <DashboardContent client:load />
+  </div>
+</Layout>

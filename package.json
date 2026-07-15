@@ -1,0 +1,21 @@
+{
+  "name": "transcriber-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "AI Audio Transcription & Translation App Monorepo",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm exec dotenv -e .env -- turbo run dev",
+    "build": "turbo run build",
+    "db:generate": "pnpm --filter database db:generate",
+    "db:migrate": "pnpm --filter database db:migrate",
+    "clean": "node scripts/clean-audio.js"
+  },
+  "devDependencies": {
+    "turbo": "^1.10.0",
+    "typescript": "^5.0.0",
+    "dotenv-cli": "^7.0.0"
+  }
+}

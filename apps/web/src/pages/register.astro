@@ -1,0 +1,122 @@
+---
+import Layout from '../layouts/Layout.astro';
+const user = Astro.locals.user;
+if (user) {
+  return Astro.redirect('/dashboard');
+}
+---
+
+<Layout title="Registrarse">
+  <div class="flex-grow flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-accent/10 rounded-full blur-[100px] pointer-events-none"></div>
+
+    <div class="max-w-md w-full space-y-8 bg-[#151D30]/60 backdrop-blur-md border border-[#1F293D] p-8 sm:p-10 rounded-3xl z-10 relative">
+      <div>
+        <h2 class="text-center text-3xl font-extrabold text-white">
+          Crear una Cuenta
+        </h2>
+        <p class="mt-2 text-center text-sm text-gray-400">
+          ¿Ya tienes cuenta?
+          <a href="/login" class="font-medium text-primary hover:text-primary-light transition-colors">
+            Inicia sesión aquí
+          </a>
+        </p>
+      </div>
+
+      <form id="registerForm" class="mt-8 space-y-6">
+        <div id="errorAlert" class="hidden p-4 rounded-xl bg-red-950/40 border border-red-900/30 text-red-400 text-sm"></div>
+        <div id="successAlert" class="hidden p-4 rounded-xl bg-green-950/40 border border-green-900/30 text-green-400 text-sm"></div>
+
+        <div class="rounded-md shadow-sm space-y-4">
+          <div>
+            <label for="email" class="block text-sm font-medium text-gray-300 mb-1.5">Correo Electrónico</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-[#1F293D] bg-[#0E1524] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all sm:text-sm"
+              placeholder="tu@correo.com"
+            />
+          </div>
+          <div>
+            <label for="password" class="block text-sm font-medium text-gray-300 mb-1.5">Contraseña</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-[#1F293D] bg-[#0E1524] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all sm:text-sm"
+              placeholder="Min. 6 caracteres"
+            />
+          </div>
+        </div>
+
+        <div>
+          <button
+            type="submit"
+            id="submitBtn"
+            class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-accent to-accent-dark hover:from-accent-dark hover:to-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0B0F19] focus:ring-accent transition-all shadow-lg shadow-accent/10 hover:shadow-accent/20"
+          >
+            Registrarse
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('registerForm') as HTMLFormElement;
+    const errorAlert = document.getElementById('errorAlert') as HTMLDivElement;
+    const successAlert = document.getElementById('successAlert') as HTMLDivElement;
+    const submitBtn = document.getElementById('submitBtn') as HTMLButtonElement;
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      errorAlert.classList.add('hidden');
+      successAlert.classList.add('hidden');
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Creando cuenta...';
+
+      const email = (document.getElementById('email') as HTMLInputElement).value;
+      const password = (document.getElementById('password') as HTMLInputElement).value;
+
+      if (password.length < 6) {
+        errorAlert.innerText = 'La contraseña debe tener al menos 6 caracteres';
+        errorAlert.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Registrarse';
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          successAlert.innerText = 'Cuenta creada con éxito. Redirigiendo a inicio de sesión...';
+          successAlert.classList.remove('hidden');
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 2000);
+        } else {
+          errorAlert.innerText = data.error || 'Ocurrió un error inesperado';
+          errorAlert.classList.remove('hidden');
+          submitBtn.disabled = false;
+          submitBtn.innerText = 'Registrarse';
+        }
+      } catch (err) {
+        errorAlert.innerText = 'Error al conectar con el servidor';
+        errorAlert.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Registrarse';
+      }
+    });
+  </script>
+</Layout>

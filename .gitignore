@@ -1,0 +1,115 @@
+# ──────────────────────────────────────────────
+# Dependencies
+# ──────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ──────────────────────────────────────────────
+# Build outputs
+# ──────────────────────────────────────────────
+dist/
+build/
+out/
+.output/
+
+# Astro build cache
+.astro/
+
+# TypeScript compiled output (keep src, ignore dist)
+packages/*/dist/
+apps/*/dist/
+
+# ──────────────────────────────────────────────
+# Environment variables (NEVER commit secrets)
+# ──────────────────────────────────────────────
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# Keep example env files
+!.env.example
+
+# ──────────────────────────────────────────────
+# Prisma
+# ──────────────────────────────────────────────
+# Generated Prisma client (regenerated via prisma generate)
+packages/database/node_modules/.prisma/
+
+# ──────────────────────────────────────────────
+# Turbo
+# ──────────────────────────────────────────────
+.turbo/
+
+# ──────────────────────────────────────────────
+# Logs
+# ──────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ──────────────────────────────────────────────
+# Runtime / temp files
+# ──────────────────────────────────────────────
+*.pid
+*.seed
+*.pid.lock
+
+# pnpm lock backup (generado por conflicto)
+pnpm-lock.yaml.*
+
+# Audio storage (user uploads, not source code)
+storage/
+apps/*/storage/
+
+# ──────────────────────────────────────────────
+# OS files
+# ──────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ──────────────────────────────────────────────
+# Editor / IDE
+# ──────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ──────────────────────────────────────────────
+# Testing
+# ──────────────────────────────────────────────
+coverage/
+.nyc_output/
+junit.xml
+
+# ──────────────────────────────────────────────
+# Vite / Rollup cache
+# ──────────────────────────────────────────────
+.vite/
+vite.config.*.timestamp-*
+
+# ──────────────────────────────────────────────
+# TypeScript
+# ──────────────────────────────────────────────
+*.tsbuildinfo

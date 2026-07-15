@@ -1,0 +1,127 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----------------------------------------------------
+// 1. USUARIOS Y AUTENTICACIÓN
+// ----------------------------------------------------
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id                    String                 @id @default(uuid())
+  email                 String                 @unique
+  passwordHash          String
+  role                  Role                   @default(USER)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  
+  // Relaciones
+  sessions              Session[]
+  transcriptionSessions TranscriptionSession[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ----------------------------------------------------
+// 2. CONFIGURACIÓN DE PROVEEDORES DE IA (ADMIN)
+// ----------------------------------------------------
+
+enum ProviderType {
+  GOOGLE
+  NVIDIA
+  OPENROUTER
+}
+
+model AIProvider {
+  id                     String       @id @default(uuid())
+  type                   ProviderType @unique
+  name                   String       // Nombre amigable (ej: "Google Gemini Free")
+  apiKey                 String       // Guardada de forma encriptada
+  baseUrl                String?      // Opcional para OpenRouter o NVIDIA
+  isActive               Boolean      @default(false)
+  isDefaultTranscription Boolean      @default(false)
+  isDefaultTranslation   Boolean      @default(false)
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+}
+
+model AdminSetting {
+  key       String   @id // Ej: "audio_retention_days", "max_upload_size_mb"
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// ----------------------------------------------------
+// 3. SESIONES Y DETALLES DE TRANSCRIPCIÓN
+// ----------------------------------------------------
+
+model TranscriptionSession {
+  id             String          @id @default(uuid())
+  userId         String
+  title          String          // Nombre descriptivo (ej: "Clase de Programación 1")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  
+  // Relaciones
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transcriptions Transcription[]
+
+  @@index([userId])
+}
+
+enum TranscriptionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Transcription {
+  id           String              @id @default(uuid())
+  sessionId    String
+  audioPath    String?             // Ruta local del archivo (ej: "/storage/audio/xxxx.webm")
+  status       TranscriptionStatus @default(PENDING)
+  originalText String?             @db.Text
+  language     String              @default("es") // Idioma detectado u original
+  duration     Float?              // Duración del audio en segundos
+  errorMessage String?             // Registro en caso de fallo
+  providerUsed ProviderType?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  // Relaciones
+  session      TranscriptionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  translations Translation[]
+
+  @@index([sessionId])
+}
+
+model Translation {
+  id              String        @id @default(uuid())
+  transcriptionId String
+  targetLanguage  String        // Idioma destino (ej: "en", "pt", "fr")
+  translatedText  String        @db.Text
+  providerUsed    ProviderType
+  createdAt       DateTime      @default(now())
+
+  // Relaciones
+  transcription   Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+
+  @@index([transcriptionId])
+}

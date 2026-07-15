@@ -1,0 +1,98 @@
+---
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+const user = Astro.locals.user;
+---
+
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title} | AI Audio Transcriber</title>
+    <!-- Premium Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-[#0B0F19] text-gray-100 font-['Outfit',sans-serif] min-h-screen flex flex-col selection:bg-primary selection:text-white">
+    <!-- Header / Navigation Bar -->
+    <header class="border-b border-[#1F293D] bg-[#0E1524]/80 backdrop-blur-md sticky top-0 z-50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <a href="/" class="flex items-center gap-2 group">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
+            <!-- Simple Waveform SVG -->
+            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+          </div>
+          <span class="text-xl font-bold bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">Transcribir<span class="text-primary font-extrabold">.AI</span></span>
+        </a>
+
+        <nav class="flex items-center gap-4">
+          {user ? (
+            <>
+              <a href="/dashboard" class="text-sm text-gray-300 hover:text-white transition-colors">Mi Panel</a>
+              {user.role === 'ADMIN' && (
+                <a href="/admin" class="text-sm text-accent-light hover:text-accent transition-colors font-medium border border-accent/30 rounded-lg px-2.5 py-1 bg-accent/5">Administración</a>
+              )}
+              <div class="h-4 w-[1px] bg-[#1F293D]"></div>
+              <span class="text-xs text-gray-400 font-mono hidden md:inline">{user.email}</span>
+              <button id="logoutBtn" class="text-sm bg-red-950/40 text-red-400 border border-red-900/30 hover:bg-red-900/40 px-3 py-1.5 rounded-lg transition-all">
+                Cerrar Sesión
+              </button>
+            </>
+          ) : (
+            <>
+              <a href="/login" class="text-sm text-gray-300 hover:text-white transition-colors">Iniciar Sesión</a>
+              <a href="/register" class="text-sm bg-gradient-to-r from-primary to-primary-dark hover:from-primary-dark hover:to-primary text-white font-medium px-4 py-2 rounded-xl transition-all shadow-md shadow-primary/10 hover:shadow-primary/20">
+                Registrarse
+              </a>
+            </>
+          )}
+        </nav>
+      </div>
+    </header>
+
+    <main class="flex-grow flex flex-col">
+      <slot />
+    </main>
+
+    <footer class="border-t border-[#1F293D] bg-[#080B13] py-6 text-center text-sm text-gray-500">
+      <p>&copy; 2026 Transcribir.AI. Todos los derechos reservados. Desarrollado con Inteligencia Artificial.</p>
+    </footer>
+
+    <!-- Global logout script if authenticated -->
+    {user && (
+      <script>
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+          logoutBtn.addEventListener('click', async () => {
+            const response = await fetch('/api/auth/logout', { method: 'POST' });
+            if (response.ok) {
+              window.location.href = '/login';
+            } else {
+              alert('Error al cerrar sesión');
+            }
+          });
+        }
+      </script>
+    )}
+  </body>
+</html>
+
+<style is:global>
+  @tailwind base;
+  @tailwind components;
+  @tailwind utilities;
+
+  body {
+    background-color: #0B0F19;
+    color: #F3F4F6;
+  }
+</style>
