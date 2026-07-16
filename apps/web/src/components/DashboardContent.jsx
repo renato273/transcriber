@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Upload, Trash2, Plus, Volume2, Globe, AlertCircle, Loader, Cpu, RefreshCw, Play } from 'lucide-react';
+import { Mic, Upload, Trash2, Plus, Volume2, Globe, AlertCircle, Loader, Cpu, RefreshCw, Play, Copy, Check } from 'lucide-react';
 import { toast, confirmDialog } from './alerts';
 
 export default function DashboardContent() {
@@ -28,6 +28,7 @@ export default function DashboardContent() {
   const [translatingId, setTranslatingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [targetLanguages, setTargetLanguages] = useState({});
+  const [copiedKey, setCopiedKey] = useState('');
 
   const [actionLoading, setActionLoading] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(true);
@@ -380,6 +381,23 @@ export default function DashboardContent() {
 
   const handleLangChange = (id, lang) => {
     setTargetLanguages(prev => ({ ...prev, [id]: lang }));
+  };
+
+  const copyToClipboard = async (text, key, label) => {
+    if (!text?.trim()) {
+      toast.warning(`No hay ${label} para copiar`);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      toast.success(`${label} copiada`);
+      setTimeout(() => {
+        setCopiedKey((prev) => (prev === key ? '' : prev));
+      }, 2000);
+    } catch {
+      toast.error('No se pudo copiar al portapapeles');
+    }
   };
 
   const formatTime = (sec) => {
@@ -741,7 +759,25 @@ export default function DashboardContent() {
                           )}
 
                           <div>
-                            <span class="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1">Texto Original</span>
+                            <div class="flex items-center justify-between gap-2 mb-1">
+                              <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Texto Original</span>
+                              {t.originalText && (
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(t.originalText, `orig-${t.id}`, 'Transcripción')}
+                                  class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-gray-400 hover:text-white hover:bg-[#1E2942] border border-transparent hover:border-[#1F293D] transition-all"
+                                  title="Copiar transcripción"
+                                  aria-label="Copiar transcripción"
+                                >
+                                  {copiedKey === `orig-${t.id}` ? (
+                                    <Check class="w-3.5 h-3.5 text-green-400" />
+                                  ) : (
+                                    <Copy class="w-3.5 h-3.5" />
+                                  )}
+                                  {copiedKey === `orig-${t.id}` ? 'Copiado' : 'Copiar'}
+                                </button>
+                              )}
+                            </div>
                             <p class="text-sm text-gray-200 bg-[#0E1524]/60 p-3 sm:p-4 border border-[#1F293D]/50 rounded-xl leading-relaxed whitespace-pre-wrap break-words">
                               {t.originalText || 'Transcribiendo audio...'}
                             </p>
@@ -751,9 +787,33 @@ export default function DashboardContent() {
                             <div class="grid grid-cols-1 gap-3 sm:gap-4">
                               {t.translations.map((tr) => (
                                 <div key={tr.id} class="bg-[#151D30]/20 border border-[#1F293D]/50 p-3 sm:p-4 rounded-xl">
-                                  <span class="text-xs font-bold text-accent-light uppercase tracking-wider block mb-1">
-                                    Traducción ({tr.targetLanguage.toUpperCase()})
-                                  </span>
+                                  <div class="flex items-center justify-between gap-2 mb-1">
+                                    <span class="text-xs font-bold text-accent-light uppercase tracking-wider">
+                                      Traducción ({tr.targetLanguage.toUpperCase()})
+                                    </span>
+                                    {tr.translatedText && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          copyToClipboard(
+                                            tr.translatedText,
+                                            `tr-${tr.id}`,
+                                            `Traducción (${tr.targetLanguage.toUpperCase()})`
+                                          )
+                                        }
+                                        class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-gray-400 hover:text-white hover:bg-[#1E2942] border border-transparent hover:border-[#1F293D] transition-all"
+                                        title="Copiar traducción"
+                                        aria-label="Copiar traducción"
+                                      >
+                                        {copiedKey === `tr-${tr.id}` ? (
+                                          <Check class="w-3.5 h-3.5 text-green-400" />
+                                        ) : (
+                                          <Copy class="w-3.5 h-3.5" />
+                                        )}
+                                        {copiedKey === `tr-${tr.id}` ? 'Copiado' : 'Copiar'}
+                                      </button>
+                                    )}
+                                  </div>
                                   <p class="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap break-words">
                                     {tr.translatedText}
                                   </p>
