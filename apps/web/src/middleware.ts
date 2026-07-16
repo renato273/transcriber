@@ -18,13 +18,17 @@ export const onRequest = defineMiddleware(async (context, next) => {
         include: { user: true }
       });
 
-      if (dbSession && dbSession.expiresAt > new Date()) {
+      if (dbSession && dbSession.expiresAt > new Date() && dbSession.user.isActive) {
         context.locals.user = {
           id: dbSession.user.id,
           email: dbSession.user.email,
           role: dbSession.user.role,
         };
       } else {
+        if (dbSession && !dbSession.user.isActive) {
+          // Cerrar sesiones huérfanas de usuarios inactivos
+          await prisma.session.deleteMany({ where: { userId: dbSession.userId } }).catch(() => {});
+        }
         context.cookies.delete('session_id', { path: '/' });
       }
     } catch (e) {
