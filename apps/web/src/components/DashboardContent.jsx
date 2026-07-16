@@ -603,34 +603,34 @@ export default function DashboardContent() {
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6 mb-6 sm:mb-8">
-              <div class="bg-[#151D30]/50 border border-[#1F293D] p-4 sm:p-5 rounded-2xl flex flex-col items-center justify-center text-center relative overflow-hidden group min-h-[160px]">
-                <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                  <Mic class="w-4 h-4 text-primary" /> Grabación en Vivo
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-3 sm:mb-4 max-w-xl sm:max-w-2xl">
+              <div class="bg-[#151D30]/50 border border-[#1F293D] p-2 sm:p-2.5 rounded-xl flex flex-col items-center justify-center text-center relative overflow-hidden group min-h-[80px]">
+                <h3 class="text-xs font-bold text-white mb-1.5 flex items-center gap-1.5">
+                  <Mic class="w-3 h-3 text-primary" /> Grabación en Vivo
                 </h3>
 
                 {isRecording ? (
-                  <div class="space-y-4 w-full">
-                    <div class="flex justify-center items-center gap-1 h-12">
-                      <div class="w-1 bg-primary rounded-full h-8 animate-pulse"></div>
-                      <div class="w-1 bg-accent rounded-full h-12 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                      <div class="w-1 bg-primary rounded-full h-6 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                      <div class="w-1 bg-accent rounded-full h-10 animate-pulse" style={{ animationDelay: '0.6s' }}></div>
-                      <div class="w-1 bg-primary rounded-full h-8 animate-pulse" style={{ animationDelay: '0.8s' }}></div>
+                  <div class="space-y-2 w-full">
+                    <div class="flex justify-center items-center gap-0.5 h-6">
+                      <div class="w-0.5 bg-primary rounded-full h-4 animate-pulse"></div>
+                      <div class="w-0.5 bg-accent rounded-full h-6 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                      <div class="w-0.5 bg-primary rounded-full h-3 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                      <div class="w-0.5 bg-accent rounded-full h-5 animate-pulse" style={{ animationDelay: '0.6s' }}></div>
+                      <div class="w-0.5 bg-primary rounded-full h-4 animate-pulse" style={{ animationDelay: '0.8s' }}></div>
                     </div>
 
-                    <div class="text-2xl font-mono font-bold text-white">{formatTime(recordingTime)}</div>
+                    <div class="text-base font-mono font-bold text-white">{formatTime(recordingTime)}</div>
 
-                    <div class="flex flex-col gap-2 sm:flex-row justify-center">
+                    <div class="flex flex-col gap-1.5 sm:flex-row justify-center">
                       <button
                         onClick={pauseRecording}
-                        class="min-h-[44px] px-4 py-2.5 border border-[#1F293D] hover:bg-[#1E2942] rounded-xl text-sm text-gray-300 transition-all"
+                        class="min-h-[36px] px-2.5 py-1.5 border border-[#1F293D] hover:bg-[#1E2942] rounded-lg text-xs text-gray-300 transition-all"
                       >
                         {isPaused ? 'Reanudar' : 'Pausar'}
                       </button>
                       <button
                         onClick={stopRecording}
-                        class="min-h-[44px] px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold transition-all shadow-md shadow-red-900/20"
+                        class="min-h-[36px] px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition-all shadow-md shadow-red-900/20"
                       >
                         Finalizar y Transcribir
                       </button>
@@ -640,14 +640,14 @@ export default function DashboardContent() {
                   <button
                     onClick={startRecording}
                     disabled={actionLoading || !canTranscribe}
-                    class="w-16 h-16 rounded-full bg-primary hover:bg-primary-dark flex items-center justify-center text-white transition-all shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 disabled:opacity-50"
+                    class="w-8 h-8 rounded-full bg-primary hover:bg-primary-dark flex items-center justify-center text-white transition-all shadow-md shadow-primary/20 hover:scale-105 active:scale-95 disabled:opacity-50"
                     aria-label="Iniciar grabación"
                   >
-                    <Mic class="w-7 h-7" />
+                    <Mic class="w-3.5 h-3.5" />
                   </button>
                 )}
                 {!isRecording && (
-                  <p class="text-xs text-gray-400 mt-4 px-2">Pulsa para grabar con tu micrófono.</p>
+                  <p class="text-[10px] text-gray-400 mt-1.5 px-1 leading-tight">Pulsa para grabar</p>
                 )}
               </div>
 
@@ -655,31 +655,31 @@ export default function DashboardContent() {
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                class={`border p-4 sm:p-5 rounded-2xl flex flex-col items-center justify-center text-center transition-all bg-[#151D30]/50 min-h-[160px] ${
+                class={`border p-2 sm:p-2.5 rounded-xl flex flex-col items-center justify-center text-center transition-all bg-[#151D30]/50 min-h-[80px] ${
                   isDragging ? 'border-primary bg-primary/5' : 'border-[#1F293D]'
                 }`}
               >
-                <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                  <Upload class="w-4 h-4 text-accent" /> Cargar Audio
+                <h3 class="text-xs font-bold text-white mb-1.5 flex items-center gap-1.5">
+                  <Upload class="w-3 h-3 text-accent" /> Cargar Audio
                 </h3>
 
                 {uploadFile ? (
-                  <div class="space-y-4 w-full">
-                    <div class="p-3 bg-[#0E1524] border border-[#1F293D] rounded-xl text-xs text-gray-300 truncate max-w-full mx-auto">
+                  <div class="space-y-2 w-full">
+                    <div class="p-1.5 bg-[#0E1524] border border-[#1F293D] rounded-lg text-[10px] text-gray-300 truncate max-w-full mx-auto">
                       {uploadFile.name} ({(uploadFile.size / (1024 * 1024)).toFixed(2)} MB)
                     </div>
-                    <div class="flex flex-wrap gap-2 justify-center">
+                    <div class="flex flex-wrap gap-1.5 justify-center">
                       <button
                         onClick={() => setUploadFile(null)}
                         disabled={actionLoading}
-                        class="min-h-[44px] px-4 py-2 border border-[#1F293D] hover:bg-[#1E2942] rounded-lg text-sm text-gray-400 hover:text-white transition-all"
+                        class="min-h-[36px] px-2.5 py-1 border border-[#1F293D] hover:bg-[#1E2942] rounded-lg text-xs text-gray-400 hover:text-white transition-all"
                       >
                         Cancelar
                       </button>
                       <button
                         onClick={submitFile}
                         disabled={actionLoading || !canTranscribe}
-                        class="min-h-[44px] px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50"
+                        class="min-h-[36px] px-2.5 py-1 bg-accent hover:bg-accent-dark text-white rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
                       >
                         Subir y Transcribir
                       </button>
@@ -687,8 +687,8 @@ export default function DashboardContent() {
                   </div>
                 ) : (
                   <div class="flex flex-col items-center">
-                    <label class="w-14 h-14 rounded-full border border-[#1F293D] bg-[#0B0F19] hover:bg-[#151D30] cursor-pointer flex items-center justify-center text-gray-400 hover:text-white transition-all mb-3 active:scale-95">
-                      <Upload class="w-5 h-5" />
+                    <label class="w-7 h-7 rounded-full border border-[#1F293D] bg-[#0B0F19] hover:bg-[#151D30] cursor-pointer flex items-center justify-center text-gray-400 hover:text-white transition-all mb-1.5 active:scale-95">
+                      <Upload class="w-3 h-3" />
                       <input
                         type="file"
                         accept="audio/*,.mp3,.wav,.m4a,.webm"
@@ -698,8 +698,8 @@ export default function DashboardContent() {
                         disabled={actionLoading}
                       />
                     </label>
-                    <p class="text-xs text-gray-400 px-2">Toca para elegir un archivo de audio</p>
-                    <span class="text-[10px] text-gray-500 mt-1">MP3, WAV, M4A, WEBM</span>
+                    <p class="text-[10px] text-gray-400 px-1 leading-tight">Elegir archivo</p>
+                    <span class="text-[9px] text-gray-500 mt-0.5">MP3, WAV, M4A, WEBM</span>
                   </div>
                 )}
               </div>
