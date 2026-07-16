@@ -151,7 +151,9 @@ docker build -t transcriber-ai:local .
 
 ### 3) Ejecutar el contenedor
 
-El `entrypoint` aplica `prisma migrate deploy` al inicio y luego arranca Astro (`node apps/web/dist/server/entry.mjs`).
+El `entrypoint` aplica `prisma migrate deploy` al inicio (sin usar pnpm en runtime) y luego arranca Astro (`node apps/web/dist/server/entry.mjs`).
+
+> **Nota Easypanel / Node 20:** no uses pnpm 11 en el contenedor (`node:sqlite` no existe en Node 20). La imagen fija `pnpm@9.15.0` solo para el build.
 
 ```bash
 docker run -d \

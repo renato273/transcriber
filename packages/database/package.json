@@ -12,10 +12,10 @@
     "db:migrate": "dotenv -e ../../.env -- prisma migrate dev"
   },
   "dependencies": {
-    "@prisma/client": "^5.0.0"
+    "@prisma/client": "^5.0.0",
+    "prisma": "^5.0.0"
   },
   "devDependencies": {
-    "prisma": "^5.0.0",
     "typescript": "^5.0.0",
     "@types/node": "^20.0.0",
     "dotenv-cli": "^7.0.0"

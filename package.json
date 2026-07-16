@@ -4,8 +4,10 @@
   "version": "1.0.0",
   "description": "AI Audio Transcription & Translation App Monorepo",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0",
+    "pnpm": "9.x"
   },
+  "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "pnpm exec dotenv -e .env -- turbo run dev",
     "dev:lan": "pnpm exec dotenv -e .env -- pnpm --filter @transcriber/web run dev:lan",

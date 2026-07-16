@@ -2,8 +2,10 @@
 # AI Transcriber — production image (pnpm monorepo)
 # ──────────────────────────────────────────────
 FROM node:20-alpine AS base
-RUN apk add --no-cache libc6-compat openssl
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+RUN apk add --no-cache libc6-compat openssl \
+  && corepack enable \
+  && corepack prepare pnpm@9.15.0 --activate
+ENV COREPACK_DEFAULT_TO_LATEST=0
 WORKDIR /app
 
 # ── prune: subgrafo de @transcriber/web ──
@@ -32,6 +34,8 @@ ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=4321
 ENV AUDIO_STORAGE_PATH=/app/storage/audio
+# No usar Corepack/pnpm en runtime (entrypoint llama a prisma directo)
+ENV COREPACK_ENABLE=0
 
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 astro
