@@ -1,12 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Shield, RefreshCw, UserCog, UserX, UserCheck, Trash2 } from 'lucide-react';
+import {
+  Users,
+  Shield,
+  RefreshCw,
+  UserCog,
+  UserX,
+  UserCheck,
+  Trash2,
+  KeyRound,
+} from 'lucide-react';
 import { toast, confirmDialog } from './alerts';
 import AdminSubnav from './AdminSubnav.jsx';
+import PasswordChecklist from './PasswordChecklist.jsx';
+import { isPasswordValid } from '../lib/password.js';
 
 export default function UsersAdminContent({ currentUserId }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
+  const [passwordUserId, setPasswordUserId] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -29,6 +44,18 @@ export default function UsersAdminContent({ currentUserId }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const openPasswordForm = (user) => {
+    setPasswordUserId(user.id);
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+
+  const closePasswordForm = () => {
+    setPasswordUserId(null);
+    setNewPassword('');
+    setConfirmPassword('');
   };
 
   const changeRole = async (user, nextRole) => {
@@ -154,11 +181,54 @@ export default function UsersAdminContent({ currentUserId }) {
       }
 
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      if (passwordUserId === user.id) closePasswordForm();
       toast.success(data.message || 'Usuario eliminado');
     } catch (e) {
       toast.error('Error al conectar con el servidor.');
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const savePassword = async (user) => {
+    if (!isPasswordValid(newPassword)) {
+      toast.error('La contraseña no cumple todos los requisitos.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Las contraseñas no coinciden.');
+      return;
+    }
+
+    const ok = await confirmDialog({
+      title: 'Cambiar contraseña',
+      message: `¿Definir una nueva contraseña para ${user.email}?${
+        user.id !== currentUserId ? ' Se cerrarán sus sesiones activas.' : ''
+      }`,
+      confirmLabel: 'Guardar',
+      cancelLabel: 'Cancelar',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
+    setSavingPassword(true);
+    try {
+      const res = await fetch('/api/admin/users/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, password: newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'No se pudo cambiar la contraseña');
+        return;
+      }
+      toast.success(data.message || 'Contraseña actualizada');
+      closePasswordForm();
+    } catch (e) {
+      toast.error('Error al conectar con el servidor.');
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -175,6 +245,8 @@ export default function UsersAdminContent({ currentUserId }) {
 
   const activeAdmins = users.filter((u) => u.role === 'ADMIN' && u.isActive).length;
   const inactiveCount = users.filter((u) => !u.isActive).length;
+  const passwordValid = isPasswordValid(newPassword);
+  const passwordsMatch = newPassword.length > 0 && newPassword === confirmPassword;
 
   return (
     <div class="max-w-4xl w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100vh-4rem)] flex flex-col justify-start">
@@ -186,7 +258,7 @@ export default function UsersAdminContent({ currentUserId }) {
               <span class="leading-tight">Usuarios</span>
             </h1>
             <p class="text-sm text-gray-400 mt-1.5">
-              Roles, inactivar (bloquear login) o eliminar. Preferí inactivar antes de borrar.
+              Roles, contraseña, inactivar o eliminar. Preferí inactivar antes de borrar.
             </p>
           </div>
           <button
@@ -224,6 +296,7 @@ export default function UsersAdminContent({ currentUserId }) {
             const isSelf = user.id === currentUserId;
             const isLastActiveAdmin = user.role === 'ADMIN' && user.isActive && activeAdmins <= 1;
             const busy = updatingId === user.id;
+            const showPassword = passwordUserId === user.id;
 
             return (
               <div
@@ -285,6 +358,20 @@ export default function UsersAdminContent({ currentUserId }) {
                 <div class="flex flex-wrap gap-2 border-t border-[#1F293D]/60 pt-3">
                   <button
                     type="button"
+                    onClick={() => (showPassword ? closePasswordForm() : openPasswordForm(user))}
+                    disabled={busy}
+                    class={`min-h-[40px] px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 transition-all disabled:opacity-50 border ${
+                      showPassword
+                        ? 'border-primary/40 bg-primary/10 text-primary-light'
+                        : 'border-[#1F293D] text-gray-300 hover:bg-[#1E2942]'
+                    }`}
+                  >
+                    <KeyRound class="w-3.5 h-3.5" />
+                    {showPassword ? 'Cerrar' : 'Contraseña'}
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => toggleActive(user)}
                     disabled={busy || (user.isActive && isLastActiveAdmin)}
                     title={
@@ -327,6 +414,79 @@ export default function UsersAdminContent({ currentUserId }) {
 
                   {busy && <RefreshCw class="w-4 h-4 animate-spin text-primary self-center" />}
                 </div>
+
+                {showPassword && (
+                  <div class="rounded-xl border border-primary/20 bg-[#0E1524]/80 p-4 space-y-3">
+                    <p class="text-xs text-gray-400">
+                      Nueva contraseña para <span class="text-white font-medium">{user.email}</span>
+                    </p>
+
+                    <div>
+                      <label class="block text-xs font-medium text-gray-400 mb-1.5">
+                        Contraseña nueva
+                      </label>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        autoComplete="new-password"
+                        placeholder="Escribí la nueva contraseña"
+                        class="w-full px-3 py-2.5 text-sm bg-[#151D30] border border-[#1F293D] rounded-xl focus:outline-none focus:ring-1 focus:ring-primary text-white"
+                      />
+                      <PasswordChecklist password={newPassword} />
+                    </div>
+
+                    <div>
+                      <label class="block text-xs font-medium text-gray-400 mb-1.5">
+                        Confirmar contraseña
+                      </label>
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        autoComplete="new-password"
+                        placeholder="Repetí la contraseña"
+                        class="w-full px-3 py-2.5 text-sm bg-[#151D30] border border-[#1F293D] rounded-xl focus:outline-none focus:ring-1 focus:ring-primary text-white"
+                      />
+                      {confirmPassword.length > 0 && (
+                        <p
+                          class={`text-xs mt-1.5 ${
+                            passwordsMatch ? 'text-green-400' : 'text-red-400'
+                          }`}
+                        >
+                          {passwordsMatch ? 'Las contraseñas coinciden' : 'Las contraseñas no coinciden'}
+                        </p>
+                      )}
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => savePassword(user)}
+                        disabled={savingPassword || !passwordValid || !passwordsMatch}
+                        class="min-h-[44px] px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {savingPassword ? (
+                          <>
+                            <RefreshCw class="w-3.5 h-3.5 animate-spin" /> Guardando…
+                          </>
+                        ) : (
+                          <>
+                            <KeyRound class="w-3.5 h-3.5" /> Guardar contraseña
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={closePasswordForm}
+                        disabled={savingPassword}
+                        class="min-h-[44px] px-4 py-2 border border-[#1F293D] text-gray-300 hover:bg-[#1E2942] rounded-xl text-sm"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })
@@ -335,7 +495,7 @@ export default function UsersAdminContent({ currentUserId }) {
 
       <p class="text-[11px] text-gray-500 flex items-start gap-2">
         <Shield class="w-3.5 h-3.5 mt-0.5 shrink-0 text-accent" />
-        Inactivar bloquea el login y cierra sesiones. Eliminar es permanente. Debe quedar al menos un ADMIN activo.
+        Contraseña: 8+ caracteres, 1 mayúscula, 1 minúscula y 1 especial. Inactivar bloquea el login.
       </p>
     </div>
   );

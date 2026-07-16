@@ -78,6 +78,10 @@ Para comprender a fondo la implementación del proyecto, lee los siguientes docu
    ```env
    DATABASE_URL="postgresql://usuario:contraseña@localhost:5432/transcriber_db"
    JWT_SECRET="tu-secreto-super-seguro-aqui"
+   
+   # Clave para cifrar API keys en la BD (debe coincidir con la usada al guardarlas)
+   # Si cambia, hay que volver a pegar las API keys en Administración.
+   ENCRYPTION_KEY="default-encryption-key-123456789012"
    # Directorio donde se guardarán los audios temporalmente
    AUDIO_STORAGE_PATH="./storage/audio"
    ```

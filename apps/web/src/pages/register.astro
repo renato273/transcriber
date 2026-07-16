@@ -47,8 +47,14 @@ if (user) {
               type="password"
               required
               class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-[#1F293D] bg-[#0E1524] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all sm:text-sm"
-              placeholder="Min. 6 caracteres"
+              placeholder="8+ caracteres, mayúscula, minúscula y especial"
             />
+            <ul id="passwordRules" class="mt-2 space-y-1.5 text-xs text-gray-500">
+              <li data-rule="minLength" class="flex items-center gap-2">○ Al menos 8 caracteres</li>
+              <li data-rule="uppercase" class="flex items-center gap-2">○ Al menos 1 mayúscula (A-Z)</li>
+              <li data-rule="lowercase" class="flex items-center gap-2">○ Al menos 1 minúscula (a-z)</li>
+              <li data-rule="special" class="flex items-center gap-2">○ Al menos 1 carácter especial (!@#$...)</li>
+            </ul>
           </div>
         </div>
 
@@ -70,6 +76,35 @@ if (user) {
     const errorAlert = document.getElementById('errorAlert') as HTMLDivElement;
     const successAlert = document.getElementById('successAlert') as HTMLDivElement;
     const submitBtn = document.getElementById('submitBtn') as HTMLButtonElement;
+    const passwordInput = document.getElementById('password') as HTMLInputElement;
+
+    function getPasswordChecks(password: string) {
+      return {
+        minLength: password.length >= 8,
+        uppercase: /[A-Z]/.test(password),
+        lowercase: /[a-z]/.test(password),
+        special: /[^A-Za-z0-9]/.test(password),
+      };
+    }
+
+    function isPasswordValid(password: string) {
+      return Object.values(getPasswordChecks(password)).every(Boolean);
+    }
+
+    function updatePasswordRules() {
+      const checks = getPasswordChecks(passwordInput?.value || '');
+      document.querySelectorAll('#passwordRules [data-rule]').forEach((el) => {
+        const rule = (el as HTMLElement).dataset.rule as keyof typeof checks;
+        const ok = checks[rule];
+        el.classList.toggle('text-green-400', ok);
+        el.classList.toggle('text-gray-500', !ok);
+        const label = el.textContent?.replace(/^[○●]\s*/, '') || '';
+        el.textContent = `${ok ? '●' : '○'} ${label}`;
+      });
+    }
+
+    passwordInput?.addEventListener('input', updatePasswordRules);
+    updatePasswordRules();
 
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -80,10 +115,10 @@ if (user) {
       submitBtn.innerText = 'Creando cuenta...';
 
       const email = (document.getElementById('email') as HTMLInputElement).value;
-      const password = (document.getElementById('password') as HTMLInputElement).value;
+      const password = passwordInput.value;
 
-      if (password.length < 6) {
-        const msg = 'La contraseña debe tener al menos 6 caracteres';
+      if (!isPasswordValid(password)) {
+        const msg = 'La contraseña debe tener 8+ caracteres, 1 mayúscula, 1 minúscula y 1 carácter especial';
         errorAlert.innerText = msg;
         errorAlert.classList.remove('hidden');
         window.alerts?.toast.warning(msg);
