@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Shield, Key, Save, RefreshCw } from 'lucide-react';
 import { toast } from './alerts';
+import AdminSubnav from './AdminSubnav.jsx';
 
 const PROVIDER_DEFS = [
   {
@@ -218,14 +219,15 @@ export default function AdminContent() {
   return (
     <div class="max-w-4xl w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100vh-4rem)] flex flex-col justify-start">
 
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-[#1F293D] pb-4 sm:pb-5 gap-3 sm:gap-4">
+      <div class="flex flex-col gap-4 border-b border-[#1F293D] pb-4 sm:pb-5">
         <div>
           <h1 class="text-2xl sm:text-3xl font-extrabold text-white flex items-center gap-2">
             <Shield class="w-7 h-7 sm:w-8 sm:h-8 text-accent shrink-0" />
-            <span class="leading-tight">Panel de Administración</span>
+            <span class="leading-tight">API Keys / Proveedores</span>
           </h1>
           <p class="text-sm text-gray-400 mt-1.5 sm:mt-1">Configura credenciales de IA y parámetros de limpieza de almacenamiento local.</p>
         </div>
+        <AdminSubnav active="providers" />
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">

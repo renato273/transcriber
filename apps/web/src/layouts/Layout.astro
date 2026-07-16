@@ -42,7 +42,10 @@ const user = Astro.locals.user;
             <>
               <a href="/dashboard" class="text-sm text-gray-300 hover:text-white transition-colors whitespace-nowrap">Mi Panel</a>
               {user.role === 'ADMIN' && (
-                <a href="/admin" class="text-sm text-accent-light hover:text-accent transition-colors font-medium border border-accent/30 rounded-lg px-2.5 py-1 bg-accent/5 whitespace-nowrap">Administración</a>
+                <>
+                  <a href="/admin" class="text-sm text-accent-light hover:text-accent transition-colors font-medium border border-accent/30 rounded-lg px-2.5 py-1 bg-accent/5 whitespace-nowrap">API Keys</a>
+                  <a href="/admin/users" class="text-sm text-accent-light hover:text-accent transition-colors font-medium border border-accent/30 rounded-lg px-2.5 py-1 bg-accent/5 whitespace-nowrap">Usuarios</a>
+                </>
               )}
               <div class="h-4 w-[1px] bg-[#1F293D]"></div>
               <span class="text-xs text-gray-400 font-mono hidden lg:inline max-w-[180px] truncate">{user.email}</span>
@@ -88,7 +91,10 @@ const user = Astro.locals.user;
             <p class="px-3 py-2 text-[11px] text-gray-500 font-mono truncate">{user.email}</p>
             <a href="/dashboard" class="block px-3 py-3 rounded-xl text-sm text-gray-200 hover:bg-[#151D30] transition-colors">Mi Panel</a>
             {user.role === 'ADMIN' && (
-              <a href="/admin" class="block px-3 py-3 rounded-xl text-sm text-accent-light hover:bg-accent/10 transition-colors">Administración</a>
+              <>
+                <a href="/admin" class="block px-3 py-3 rounded-xl text-sm text-accent-light hover:bg-accent/10 transition-colors">API Keys / Proveedores</a>
+                <a href="/admin/users" class="block px-3 py-3 rounded-xl text-sm text-accent-light hover:bg-accent/10 transition-colors">Usuarios</a>
+              </>
             )}
             <button id="logoutBtnMobile" class="w-full text-left px-3 py-3 rounded-xl text-sm text-red-400 hover:bg-red-950/30 transition-colors">
               Cerrar Sesión

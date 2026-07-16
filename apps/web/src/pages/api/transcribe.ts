@@ -114,7 +114,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     let text = '';
     try {
-      const apiKey = decrypt(activeProvider.apiKey, ENCRYPTION_KEY);
+      let apiKey: string;
+      try {
+        apiKey = decrypt(activeProvider.apiKey, ENCRYPTION_KEY);
+      } catch {
+        throw new Error(
+          'No se pudo desencriptar la API key. Vuelve a guardarla en Administración → API Keys.'
+        );
+      }
       const adapter = AIServiceFactory.createAdapter(
         activeProvider.type,
         apiKey,

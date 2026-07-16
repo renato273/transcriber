@@ -41,9 +41,18 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return context.redirect('/login');
   }
 
-  // Admin route check
-  if (url.pathname.startsWith('/admin') && context.locals.user?.role !== 'ADMIN') {
-    return context.redirect('/dashboard');
+  // Admin pages + APIs: solo ADMIN
+  if (
+    (url.pathname.startsWith('/admin') || url.pathname.startsWith('/api/admin')) &&
+    context.locals.user?.role !== 'ADMIN'
+  ) {
+    if (url.pathname.startsWith('/api/')) {
+      return new Response(JSON.stringify({ error: 'No autorizado' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return context.redirect(context.locals.user ? '/dashboard' : '/login');
   }
 
   return next();
