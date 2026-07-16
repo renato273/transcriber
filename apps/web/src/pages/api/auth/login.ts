@@ -38,6 +38,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
 
+    if (!user.isActive) {
+      return new Response(JSON.stringify({
+        error: 'Tu cuenta está desactivada. Contacta a un administrador.',
+      }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     // Create session in DB
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiration

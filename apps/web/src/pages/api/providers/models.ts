@@ -47,7 +47,23 @@ export const GET: APIRoute = async ({ locals, url }) => {
       );
     }
 
-    const apiKey = decrypt(provider.apiKey, ENCRYPTION_KEY);
+    let apiKey: string;
+    try {
+      apiKey = decrypt(provider.apiKey, ENCRYPTION_KEY);
+    } catch {
+      return new Response(
+        JSON.stringify({
+          error:
+            'No se pudo desencriptar la API key. La ENCRYPTION_KEY cambió o la clave está corrupta. Vuelve a guardarla en Administración → API Keys.',
+          models: [],
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const models = await listFreeModels(type, apiKey, capability);
 
     return new Response(

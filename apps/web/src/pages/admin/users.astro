@@ -1,6 +1,6 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import AdminContent from '../components/AdminContent';
+import Layout from '../../layouts/Layout.astro';
+import UsersAdminContent from '../../components/UsersAdminContent';
 
 const user = Astro.locals.user;
 if (!user || user.role !== 'ADMIN') {
@@ -8,13 +8,11 @@ if (!user || user.role !== 'ADMIN') {
 }
 ---
 
-<Layout title="Panel de Administración">
+<Layout title="Administración de Usuarios">
   <div class="relative min-h-[calc(100vh-4rem)] flex flex-col bg-[#0B0F19]">
-    {/* Background glow effects */}
     <div class="absolute top-10 left-10 w-[200px] h-[200px] bg-accent/5 rounded-full blur-3xl pointer-events-none"></div>
     <div class="absolute bottom-10 right-10 w-[200px] h-[200px] bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
 
-    {/* Admin dashboard */}
-    <AdminContent client:load />
+    <UsersAdminContent client:load currentUserId={user.id} />
   </div>
 </Layout>

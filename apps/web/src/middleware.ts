@@ -18,13 +18,17 @@ export const onRequest = defineMiddleware(async (context, next) => {
         include: { user: true }
       });
 
-      if (dbSession && dbSession.expiresAt > new Date()) {
+      if (dbSession && dbSession.expiresAt > new Date() && dbSession.user.isActive) {
         context.locals.user = {
           id: dbSession.user.id,
           email: dbSession.user.email,
           role: dbSession.user.role,
         };
       } else {
+        if (dbSession && !dbSession.user.isActive) {
+          // Cerrar sesiones huérfanas de usuarios inactivos
+          await prisma.session.deleteMany({ where: { userId: dbSession.userId } }).catch(() => {});
+        }
         context.cookies.delete('session_id', { path: '/' });
       }
     } catch (e) {
@@ -41,9 +45,18 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return context.redirect('/login');
   }
 
-  // Admin route check
-  if (url.pathname.startsWith('/admin') && context.locals.user?.role !== 'ADMIN') {
-    return context.redirect('/dashboard');
+  // Admin pages + APIs: solo ADMIN
+  if (
+    (url.pathname.startsWith('/admin') || url.pathname.startsWith('/api/admin')) &&
+    context.locals.user?.role !== 'ADMIN'
+  ) {
+    if (url.pathname.startsWith('/api/')) {
+      return new Response(JSON.stringify({ error: 'No autorizado' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return context.redirect(context.locals.user ? '/dashboard' : '/login');
   }
 
   return next();

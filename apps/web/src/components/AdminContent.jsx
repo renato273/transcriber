@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Shield, Key, Save, RefreshCw } from 'lucide-react';
 import { toast } from './alerts';
+import AdminSubnav from './AdminSubnav.jsx';
 
 const PROVIDER_DEFS = [
   {
@@ -44,7 +45,8 @@ const PROVIDER_DEFS = [
 export default function AdminContent() {
   const [providers, setProviders] = useState([]);
   const [settings, setSettings] = useState({
-    audio_retention_days: '7'
+    audio_retention_days: '7',
+    allow_registration: 'false',
   });
   const [loading, setLoading] = useState(true);
   const [savingProvider, setSavingProvider] = useState(null);
@@ -174,8 +176,11 @@ export default function AdminContent() {
   };
 
   const handleSettingsChange = (e) => {
-    const { name, value } = e.target;
-    setSettings((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setSettings((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? (checked ? 'true' : 'false') : value,
+    }));
   };
 
   const saveSettings = async (e) => {
@@ -183,16 +188,22 @@ export default function AdminContent() {
     setSavingSettings(true);
 
     try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: 'audio_retention_days',
-          value: settings.audio_retention_days,
-        }),
-      });
+      const payloads = [
+        { key: 'audio_retention_days', value: settings.audio_retention_days },
+        { key: 'allow_registration', value: settings.allow_registration === 'true' ? 'true' : 'false' },
+      ];
 
-      if (res.ok) {
+      const results = await Promise.all(
+        payloads.map((body) =>
+          fetch('/api/admin/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+        )
+      );
+
+      if (results.every((r) => r.ok)) {
         toast.success('Configuraciones generales guardadas con éxito.');
       } else {
         toast.error('Error al guardar configuraciones.');
@@ -218,14 +229,15 @@ export default function AdminContent() {
   return (
     <div class="max-w-4xl w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100vh-4rem)] flex flex-col justify-start">
 
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-[#1F293D] pb-4 sm:pb-5 gap-3 sm:gap-4">
+      <div class="flex flex-col gap-4 border-b border-[#1F293D] pb-4 sm:pb-5">
         <div>
           <h1 class="text-2xl sm:text-3xl font-extrabold text-white flex items-center gap-2">
             <Shield class="w-7 h-7 sm:w-8 sm:h-8 text-accent shrink-0" />
-            <span class="leading-tight">Panel de Administración</span>
+            <span class="leading-tight">API Keys / Proveedores</span>
           </h1>
           <p class="text-sm text-gray-400 mt-1.5 sm:mt-1">Configura credenciales de IA y parámetros de limpieza de almacenamiento local.</p>
         </div>
+        <AdminSubnav active="providers" />
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
@@ -365,6 +377,33 @@ export default function AdminContent() {
               />
               <p class="text-[10px] text-gray-500 mt-2 leading-relaxed">
                 Los archivos de audio subidos o grabados se eliminarán físicamente del disco del servidor después de estos días para conservar almacenamiento. Los registros de texto son permanentes.
+              </p>
+            </div>
+
+            <div class="pt-2 border-t border-[#1F293D]">
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="allow_registration"
+                  checked={settings.allow_registration === 'true'}
+                  onChange={handleSettingsChange}
+                  class="mt-1 rounded bg-[#0E1524] border-[#1F293D] text-primary focus:ring-0 focus:ring-offset-0"
+                />
+                <span>
+                  <span class="block text-sm font-semibold text-white">Permitir registro de nuevos usuarios</span>
+                  <span class="block text-[10px] text-gray-500 mt-1 leading-relaxed">
+                    Tras crear el primer ADMIN, el registro se cierra solo. Activá esta opción para permitir altas públicas de USER otra vez. Los admins existentes no se ven afectados.
+                  </span>
+                </span>
+              </label>
+              <p
+                class={`mt-3 text-xs font-medium px-2.5 py-1.5 rounded-lg border inline-block ${
+                  settings.allow_registration === 'true'
+                    ? 'bg-green-500/10 border-green-500/25 text-green-400'
+                    : 'bg-amber-500/10 border-amber-500/25 text-amber-300'
+                }`}
+              >
+                Estado: {settings.allow_registration === 'true' ? 'Registro abierto' : 'Registro cerrado'}
               </p>
             </div>
 

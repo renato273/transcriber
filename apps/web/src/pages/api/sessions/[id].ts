@@ -43,7 +43,15 @@ export const GET: APIRoute = async ({ params, locals }) => {
       });
     }
 
-    return new Response(JSON.stringify(session), {
+    const safeSession = {
+      ...session,
+      transcriptions: session.transcriptions.map(({ audioPath, ...rest }) => ({
+        ...rest,
+        hasAudio: !!(audioPath && fs.existsSync(audioPath)),
+      })),
+    };
+
+    return new Response(JSON.stringify(safeSession), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
