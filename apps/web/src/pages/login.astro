@@ -1,8 +1,17 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { isRegistrationOpen } from '../lib/registration';
+
 const user = Astro.locals.user;
 if (user) {
   return Astro.redirect('/dashboard');
+}
+
+let registrationOpen = true;
+try {
+  registrationOpen = (await isRegistrationOpen()).open;
+} catch {
+  registrationOpen = false;
 }
 ---
 
@@ -16,10 +25,16 @@ if (user) {
           Bienvenido de nuevo
         </h2>
         <p class="mt-2 text-center text-sm text-gray-400">
-          ¿No tienes una cuenta?
-          <a href="/register" class="font-medium text-primary hover:text-primary-light transition-colors">
-            Regístrate aquí
-          </a>
+          {registrationOpen ? (
+            <>
+              ¿No tienes una cuenta?
+              <a href="/register" class="font-medium text-primary hover:text-primary-light transition-colors">
+                Regístrate aquí
+              </a>
+            </>
+          ) : (
+            <>El registro público está cerrado. Si necesitás acceso, contactá a un administrador.</>
+          )}
         </p>
       </div>
 

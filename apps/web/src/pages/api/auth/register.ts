@@ -2,6 +2,10 @@ import type { APIRoute } from 'astro';
 import { prisma } from '@transcriber/database';
 import bcrypt from 'bcryptjs';
 import { isPasswordValid, passwordValidationError } from '../../../lib/password.js';
+import {
+  isRegistrationOpen,
+  closeRegistrationAfterBootstrap,
+} from '../../../lib/registration.js';
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -21,6 +25,17 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
+    const status = await isRegistrationOpen();
+    if (!status.open) {
+      return new Response(
+        JSON.stringify({
+          error:
+            'El registro de nuevos usuarios está deshabilitado. Contactá a un administrador.',
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -33,9 +48,8 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-
-    const usersCount = await prisma.user.count();
-    const role = usersCount === 0 ? 'ADMIN' : 'USER';
+    const isFirstUser = status.needsBootstrap;
+    const role = isFirstUser ? 'ADMIN' : 'USER';
 
     const user = await prisma.user.create({
       data: {
@@ -45,10 +59,18 @@ export const POST: APIRoute = async ({ request }) => {
       },
     });
 
+    if (isFirstUser) {
+      await closeRegistrationAfterBootstrap();
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         user: { id: user.id, email: user.email, role: user.role },
+        registrationClosed: isFirstUser,
+        message: isFirstUser
+          ? 'Administrador creado. El registro público quedó cerrado; podés reabrirlo en Administración.'
+          : undefined,
       }),
       {
         status: 201,

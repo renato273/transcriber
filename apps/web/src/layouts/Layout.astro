@@ -1,5 +1,6 @@
 ---
 import AlertHost from '../components/alerts/AlertHost.jsx';
+import { isRegistrationOpen } from '../lib/registration';
 
 interface Props {
   title: string;
@@ -7,6 +8,13 @@ interface Props {
 
 const { title } = Astro.props;
 const user = Astro.locals.user;
+
+let registrationOpen = true;
+try {
+  registrationOpen = (await isRegistrationOpen()).open;
+} catch {
+  registrationOpen = false;
+}
 ---
 
 <!DOCTYPE html>
@@ -56,9 +64,11 @@ const user = Astro.locals.user;
           ) : (
             <>
               <a href="/login" class="text-sm text-gray-300 hover:text-white transition-colors whitespace-nowrap">Iniciar Sesión</a>
-              <a href="/register" class="text-sm bg-gradient-to-r from-primary to-primary-dark hover:from-primary-dark hover:to-primary text-white font-medium px-4 py-2 rounded-xl transition-all shadow-md shadow-primary/10 hover:shadow-primary/20 whitespace-nowrap">
-                Registrarse
-              </a>
+              {registrationOpen && (
+                <a href="/register" class="text-sm bg-gradient-to-r from-primary to-primary-dark hover:from-primary-dark hover:to-primary text-white font-medium px-4 py-2 rounded-xl transition-all shadow-md shadow-primary/10 hover:shadow-primary/20 whitespace-nowrap">
+                  Registrarse
+                </a>
+              )}
             </>
           )}
         </nav>
@@ -103,7 +113,9 @@ const user = Astro.locals.user;
         ) : (
           <>
             <a href="/login" class="block px-3 py-3 rounded-xl text-sm text-gray-200 hover:bg-[#151D30] transition-colors">Iniciar Sesión</a>
-            <a href="/register" class="block px-3 py-3 rounded-xl text-sm font-semibold text-white bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors text-center">Registrarse</a>
+            {registrationOpen && (
+              <a href="/register" class="block px-3 py-3 rounded-xl text-sm font-semibold text-white bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors text-center">Registrarse</a>
+            )}
           </>
         )}
       </nav>

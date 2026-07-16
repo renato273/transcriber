@@ -175,6 +175,13 @@ curl -I http://localhost:4321/
 
 Solo los **ADMIN** ven y acceden a `/admin` y `/admin/users`.
 
+## Registro de usuarios
+
+1. Si **no hay usuarios**, `/register` permite crear el **primer ADMIN**.
+2. Al crearlo, el registro público se **cierra solo**.
+3. Un ADMIN puede reabrir altas en **API Keys / Proveedores → Ajustes → “Permitir registro de nuevos usuarios”**.
+4. Con el registro cerrado, las rutas y botones de “Registrarse” se ocultan; la API responde `403`.
+
 ### Contraseñas
 
 Deben cumplir:

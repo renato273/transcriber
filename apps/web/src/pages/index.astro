@@ -1,6 +1,15 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { isRegistrationOpen } from '../lib/registration';
+
 const user = Astro.locals.user;
+
+let registrationOpen = true;
+try {
+  registrationOpen = (await isRegistrationOpen()).open;
+} catch {
+  registrationOpen = false;
+}
 ---
 
 <Layout title="Transcribe y Traduce con IA">
@@ -39,12 +48,14 @@ const user = Astro.locals.user;
           </a>
         ) : (
           <>
-            <a
-              href="/register"
-              class="w-full sm:w-auto min-h-[48px] px-8 py-3.5 sm:py-4 bg-gradient-to-r from-primary to-primary-dark hover:from-primary-dark hover:to-primary text-white font-semibold rounded-2xl shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all text-center inline-flex items-center justify-center"
-            >
-              Comenzar Gratis Ahora
-            </a>
+            {registrationOpen ? (
+              <a
+                href="/register"
+                class="w-full sm:w-auto min-h-[48px] px-8 py-3.5 sm:py-4 bg-gradient-to-r from-primary to-primary-dark hover:from-primary-dark hover:to-primary text-white font-semibold rounded-2xl shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all text-center inline-flex items-center justify-center"
+              >
+                Comenzar Gratis Ahora
+              </a>
+            ) : null}
             <a
               href="/login"
               class="w-full sm:w-auto min-h-[48px] px-8 py-3.5 sm:py-4 bg-[#151D30] hover:bg-[#1E2942] text-gray-300 border border-[#1F293D] hover:text-white font-semibold rounded-2xl transition-all text-center inline-flex items-center justify-center"

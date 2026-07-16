@@ -45,7 +45,8 @@ const PROVIDER_DEFS = [
 export default function AdminContent() {
   const [providers, setProviders] = useState([]);
   const [settings, setSettings] = useState({
-    audio_retention_days: '7'
+    audio_retention_days: '7',
+    allow_registration: 'false',
   });
   const [loading, setLoading] = useState(true);
   const [savingProvider, setSavingProvider] = useState(null);
@@ -175,8 +176,11 @@ export default function AdminContent() {
   };
 
   const handleSettingsChange = (e) => {
-    const { name, value } = e.target;
-    setSettings((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setSettings((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? (checked ? 'true' : 'false') : value,
+    }));
   };
 
   const saveSettings = async (e) => {
@@ -184,16 +188,22 @@ export default function AdminContent() {
     setSavingSettings(true);
 
     try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: 'audio_retention_days',
-          value: settings.audio_retention_days,
-        }),
-      });
+      const payloads = [
+        { key: 'audio_retention_days', value: settings.audio_retention_days },
+        { key: 'allow_registration', value: settings.allow_registration === 'true' ? 'true' : 'false' },
+      ];
 
-      if (res.ok) {
+      const results = await Promise.all(
+        payloads.map((body) =>
+          fetch('/api/admin/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+        )
+      );
+
+      if (results.every((r) => r.ok)) {
         toast.success('Configuraciones generales guardadas con éxito.');
       } else {
         toast.error('Error al guardar configuraciones.');
@@ -367,6 +377,33 @@ export default function AdminContent() {
               />
               <p class="text-[10px] text-gray-500 mt-2 leading-relaxed">
                 Los archivos de audio subidos o grabados se eliminarán físicamente del disco del servidor después de estos días para conservar almacenamiento. Los registros de texto son permanentes.
+              </p>
+            </div>
+
+            <div class="pt-2 border-t border-[#1F293D]">
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="allow_registration"
+                  checked={settings.allow_registration === 'true'}
+                  onChange={handleSettingsChange}
+                  class="mt-1 rounded bg-[#0E1524] border-[#1F293D] text-primary focus:ring-0 focus:ring-offset-0"
+                />
+                <span>
+                  <span class="block text-sm font-semibold text-white">Permitir registro de nuevos usuarios</span>
+                  <span class="block text-[10px] text-gray-500 mt-1 leading-relaxed">
+                    Tras crear el primer ADMIN, el registro se cierra solo. Activá esta opción para permitir altas públicas de USER otra vez. Los admins existentes no se ven afectados.
+                  </span>
+                </span>
+              </label>
+              <p
+                class={`mt-3 text-xs font-medium px-2.5 py-1.5 rounded-lg border inline-block ${
+                  settings.allow_registration === 'true'
+                    ? 'bg-green-500/10 border-green-500/25 text-green-400'
+                    : 'bg-amber-500/10 border-amber-500/25 text-amber-300'
+                }`}
+              >
+                Estado: {settings.allow_registration === 'true' ? 'Registro abierto' : 'Registro cerrado'}
               </p>
             </div>
 
