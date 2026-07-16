@@ -1,97 +1,213 @@
-# AI Transcriber & Translator (Monorepo)
+# AI Transcriber & Translator
 
-Este es un proyecto web monorepo diseñado para la transcripción de audio (grabado en vivo o subido mediante archivos) y su posterior traducción a múltiples idiomas mediante el uso de proveedores de Inteligencia Artificial gratuitos (Google Gemini, NVIDIA NIM, OpenRouter).
+Aplicación web para **transcribir audio** (micrófono o archivo) y **traducirlo** usando capas gratuitas de IA (Google Gemini, NVIDIA, OpenRouter, Mistral, Groq, GitHub Models).
 
-## Stack Tecnológico
-
-* **Frontend & Backend (API)**: [Astro](https://astro.build/) con la integración de [React](https://react.dev/) para componentes interactivos y reactivos en el cliente.
-* **Base de Datos**: [PostgreSQL](https://www.postgresql.org/).
-* **ORM**: [Prisma](https://www.prisma.io/).
-* **Estilos**: [Tailwind CSS](https://tailwindcss.com/) (configurado en la aplicación frontend de Astro).
-* **Gestor de Monorepo**: `pnpm` workspaces (recomendado por velocidad y eficiencia de espacio).
+Monorepo con Astro (SSR) + React, PostgreSQL/Prisma y despliegue por imagen Docker publicada en Docker Hub al hacer merge a `main`.
 
 ---
 
-## Estructura del Monorepo
+## Stack
 
-El proyecto está organizado como un monorepo para separar limpiamente la interfaz de usuario, la configuración de la base de datos y la lógica compartida de servicios:
+| Capa | Tecnología |
+|------|------------|
+| App | Astro 4 (SSR Node) + React + Tailwind |
+| DB | PostgreSQL + Prisma |
+| Monorepo | pnpm workspaces + Turbo |
+| Deploy | Docker multi-stage + GitHub Actions → Docker Hub |
+
+---
+
+## Estructura
 
 ```text
 transcriber/
-├── apps/
-│   └── web/                     # Aplicación principal en Astro + React
-│       ├── public/              # Archivos públicos estáticos
-│       └── src/
-│           ├── components/      # Componentes React e islas de Astro
-│           ├── layouts/         # Layouts base de la página
-│           ├── pages/           # Páginas y rutas de la API de Astro
-│           └── env.d.ts         # Tipados de variables de entorno
+├── apps/web/                 # Astro + React (UI + API routes)
 ├── packages/
-│   ├── database/                # Package de base de datos con Prisma
-│   │   ├── prisma/
-│   │   │   └── schema.prisma    # Esquema de la base de datos
-│   │   ├── src/                 # Cliente exportable de Prisma
-│   │   └── package.json
-│   └── ai-services/             # Lógica compartida para interactuar con proveedores de IA
-│       ├── src/                 # Adaptadores de Google, Nvidia y OpenRouter
-│       └── package.json
-├── docs/                        # Documentación detallada del proyecto
-│   ├── architecture.md          # Arquitectura del sistema y flujo de datos
-│   ├── database.md              # Diseño de base de datos y esquema
-│   ├── api_integration.md       # API y configuración de proveedores de IA
-│   └── agents.md                # Agentes de IA sugeridos para el desarrollo
-├── package.json                 # Configuración raíz de pnpm workspaces
-├── pnpm-workspace.yaml          # Definición de workspaces
-└── README.md                    # Este archivo
+│   ├── database/             # Prisma schema, migraciones, encrypt
+│   └── ai-services/          # Adaptadores de proveedores de IA
+├── docker/entrypoint.sh      # Migraciones Prisma al arrancar el contenedor
+├── Dockerfile
+├── .github/workflows/
+│   └── docker-publish.yml    # Build & push a Docker Hub en push a main
+└── docs/                     # Arquitectura, DB, APIs
 ```
 
 ---
 
-## Documentación Detallada
+## Variables de entorno
 
-Para comprender a fondo la implementación del proyecto, lee los siguientes documentos en la carpeta `docs/`:
+Creá un `.env` en la **raíz** del repo (no lo subas a Git).
 
-1. [**Arquitectura (`docs/architecture.md`)**](docs/architecture.md): Detalles sobre la comunicación frontend-backend, gestión de grabaciones, almacenamiento local de audios y scripts de limpieza.
-2. [**Base de Datos (`docs/database.md`)**](docs/database.md): Detalle del esquema de base de datos PostgreSQL, migraciones de Prisma y modelos de datos.
-3. [**Integración de APIs (`docs/api_integration.md`)**](docs/api_integration.md): Endpoints de la API, integración con Google Gemini, NVIDIA NIM y OpenRouter, y la configuración de API Keys gratuitas.
-4. [**Agentes de Desarrollo (`docs/agents.md`)**](docs/agents.md): Definición de los agentes de IA necesarios para programar la aplicación.
+| Variable | Obligatorio | Descripción |
+|----------|-------------|-------------|
+| `DATABASE_URL` | Sí | Connection string PostgreSQL |
+| `JWT_SECRET` | Sí | Secreto para firmar cookies de sesión |
+| `ENCRYPTION_KEY` | Sí | Clave para cifrar API keys en la BD. **Si la cambiás, hay que volver a guardar las API keys en Admin** |
+| `AUDIO_STORAGE_PATH` | No | Carpeta de audios (default `./storage/audio`; en Docker: `/app/storage/audio`) |
+| `HOST` | No | En Docker/producción: `0.0.0.0` |
+| `PORT` | No | Puerto HTTP (default contenedor: `4321`) |
+| `NODE_ENV` | No | `production` en deploy |
+
+Ejemplo:
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/transcriber"
+JWT_SECRET="cambia-este-secreto-largo"
+ENCRYPTION_KEY="cambia-esta-clave-de-cifrado"
+AUDIO_STORAGE_PATH="./storage/audio"
+HOST=0.0.0.0
+PORT=4321
+NODE_ENV=production
+```
+
+> Las API keys de Gemini/NVIDIA/etc. **no van en el `.env`**: se configuran en la UI de administración y se guardan cifradas en la base.
 
 ---
 
-## Requisitos Previos
+## Desarrollo local
 
-* Node.js v18 o superior.
-* [pnpm](https://pnpm.io/) instalado globalmente (`npm install -g pnpm`).
-* Una instancia activa de PostgreSQL.
+### Requisitos
+
+- Node.js ≥ 18
+- pnpm (`npm install -g pnpm`)
+- PostgreSQL accesible
+
+### Pasos
+
+```bash
+pnpm install
+
+# .env en la raíz (ver tabla arriba)
+
+# Migraciones
+cd packages/database
+pnpm exec dotenv -e ../../.env -- prisma migrate deploy
+pnpm exec prisma generate
+cd ../..
+
+# (opcional) compilar packages
+pnpm --filter @transcriber/database build
+pnpm --filter @transcriber/ai-services build
+
+# Dev server → http://localhost:4321
+pnpm dev
+```
+
+Alternativa de migración en desarrollo:
+
+```bash
+pnpm --filter @transcriber/database db:migrate
+```
+
+### Primer usuario
+
+El **primer registro** del sistema se crea como `ADMIN`. Los siguientes como `USER`.
 
 ---
 
-## Inicio Rápido
+## Deploy con Docker
 
-1. **Instalar dependencias**:
-   ```bash
-   pnpm install
-   ```
+### 1) Publicación automática (GitHub Actions)
 
-2. **Configurar variables de entorno**:
-   Crea un archivo `.env` en la raíz del monorepo (y copia lo correspondiente a `apps/web/.env` y `packages/database/.env`):
-   ```env
-   DATABASE_URL="postgresql://usuario:contraseña@localhost:5432/transcriber_db"
-   JWT_SECRET="tu-secreto-super-seguro-aqui"
-   
-   # Clave para cifrar API keys en la BD (debe coincidir con la usada al guardarlas)
-   # Si cambia, hay que volver a pegar las API keys en Administración.
-   ENCRYPTION_KEY="default-encryption-key-123456789012"
-   # Directorio donde se guardarán los audios temporalmente
-   AUDIO_STORAGE_PATH="./storage/audio"
-   ```
+Al hacer **push/merge a `main`**, el workflow `.github/workflows/docker-publish.yml`:
 
-3. **Ejecutar migraciones de base de datos**:
-   ```bash
-   pnpm --filter database db:migrate
-   ```
+1. Builda la imagen con el `Dockerfile`
+2. La publica en Docker Hub como:
 
-4. **Correr el proyecto en desarrollo**:
-   ```bash
-   pnpm dev
-   ```
+```text
+{DOCKERHUB_USERNAME}/transcriber-ai:latest
+{DOCKERHUB_USERNAME}/transcriber-ai:sha-xxxxx
+```
+
+**Secrets del repositorio** (GitHub → Settings → Secrets and variables → Actions):
+
+| Secret | Descripción |
+|--------|-------------|
+| `DOCKERHUB_USERNAME` | Usuario de Docker Hub |
+| `DOCKERHUB_TOKEN` | Access Token de Docker Hub (Account Settings → Security) |
+
+También se puede disparar manualmente: Actions → **Build and Push to Docker Hub** → Run workflow.
+
+### 2) Build local de la imagen (opcional)
+
+```bash
+docker build -t transcriber-ai:local .
+```
+
+### 3) Ejecutar el contenedor
+
+El `entrypoint` aplica `prisma migrate deploy` al inicio y luego arranca Astro (`node apps/web/dist/server/entry.mjs`).
+
+```bash
+docker run -d \
+  --name transcriber \
+  -p 4321:4321 \
+  -e DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/transcriber" \
+  -e JWT_SECRET="cambia-este-secreto-largo" \
+  -e ENCRYPTION_KEY="cambia-esta-clave-de-cifrado" \
+  -e HOST=0.0.0.0 \
+  -e PORT=4321 \
+  -e NODE_ENV=production \
+  -e AUDIO_STORAGE_PATH="/app/storage/audio" \
+  -v transcriber_audio:/app/storage/audio \
+  {DOCKERHUB_USERNAME}/transcriber-ai:latest
+```
+
+Notas:
+
+- PostgreSQL debe ser alcanzable desde el contenedor (usa IP/host de la red, no `localhost` salvo que sea la misma máquina con `--network host` o similar).
+- Montá un volumen en `/app/storage/audio` si querés persistir los audios entre reinicios.
+- `ENCRYPTION_KEY` debe ser **estable** entre deploys; si cambia, las API keys guardadas dejan de desencriptarse y hay que re-pegarlas en Admin.
+
+### 4) Health check rápido
+
+```bash
+curl -I http://localhost:4321/
+```
+
+---
+
+## Después del deploy (configuración)
+
+1. Abrí la app y **registrá** el primer usuario (queda como ADMIN), o usá uno existente.
+2. Entrá a **API Keys / Proveedores** (`/admin`) y cargá las keys de los proveedores que uses. Activalos y marcá defaults de transcripción/traducción.
+3. Opcional: **Usuarios** (`/admin/users`) para roles (`ADMIN`/`USER`), inactivar, eliminar o cambiar contraseña.
+
+Solo los **ADMIN** ven y acceden a `/admin` y `/admin/users`.
+
+### Contraseñas
+
+Deben cumplir:
+
+- ≥ 8 caracteres  
+- 1 mayúscula  
+- 1 minúscula  
+- 1 carácter especial  
+
+(validación en registro y al cambiar clave desde admin)
+
+---
+
+## Comandos útiles
+
+```bash
+pnpm dev                                          # desarrollo
+pnpm build                                        # build monorepo
+pnpm --filter @transcriber/database db:generate   # regenerar Prisma Client
+pnpm --filter @transcriber/ai-services build      # rebuild adaptadores IA
+```
+
+---
+
+## Documentación adicional
+
+- [Arquitectura](docs/architecture.md)
+- [Base de datos](docs/database.md)
+- [Integración de APIs](docs/api_integration.md)
+- [Agentes de desarrollo](docs/agents.md)
+
+---
+
+## Licencia / uso
+
+Uso interno / MVP. Revisá los términos de cada proveedor de IA (cuotas free tier) antes de producción.
