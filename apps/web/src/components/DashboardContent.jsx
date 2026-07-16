@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Upload, Trash2, Plus, Volume2, Globe, AlertCircle, Loader, Cpu, RefreshCw, Play, Copy, Check } from 'lucide-react';
+import { Mic, Upload, Trash2, Plus, Volume2, Globe, AlertCircle, Loader, Cpu, RefreshCw, Play, Copy, Check, RotateCcw } from 'lucide-react';
 import { toast, confirmDialog } from './alerts';
 
 export default function DashboardContent() {
@@ -27,6 +27,7 @@ export default function DashboardContent() {
 
   const [translatingId, setTranslatingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [retryingId, setRetryingId] = useState(null);
   const [targetLanguages, setTargetLanguages] = useState({});
   const [copiedKey, setCopiedKey] = useState('');
 
@@ -218,6 +219,59 @@ export default function DashboardContent() {
       toast.error('Error al conectar con el servidor');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const retryTranscription = async (id) => {
+    if (!selectedProvider || !selectedModel) {
+      toast.error('Seleccioná proveedor y modelo arriba antes de reintentar.');
+      return;
+    }
+    if (!canTranscribe) {
+      toast.error('Esperá a que carguen los modelos free.');
+      return;
+    }
+
+    const ok = await confirmDialog({
+      title: 'Reintentar transcripción',
+      message: `Se volverá a transcribir el audio guardado con ${providerLabel(selectedProvider) || selectedProvider} · ${selectedModel.split('/').pop()}.`,
+      confirmLabel: 'Reintentar',
+      cancelLabel: 'Cancelar',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
+    setRetryingId(id);
+    setTranscriptions((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, status: 'PROCESSING', errorMessage: null }
+          : t
+      )
+    );
+
+    try {
+      const res = await fetch(`/api/transcriptions/${id}/retry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerType: selectedProvider,
+          modelId: selectedModel,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchSessionDetails(activeSession.id);
+        toast.success('Transcripción completada');
+      } else {
+        await fetchSessionDetails(activeSession.id);
+        toast.error(data.error || data.details || 'Falló el reintento');
+      }
+    } catch (e) {
+      await fetchSessionDetails(activeSession?.id);
+      toast.error('Error al conectar con el servidor');
+    } finally {
+      setRetryingId(null);
     }
   };
 
@@ -785,6 +839,44 @@ export default function DashboardContent() {
                               </audio>
                             </div>
                           )}
+                          <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => retryTranscription(t.id)}
+                              disabled={
+                                retryingId === t.id ||
+                                actionLoading ||
+                                !t.hasAudio ||
+                                !canTranscribe
+                              }
+                              title={
+                                !t.hasAudio
+                                  ? 'Audio no disponible'
+                                  : !canTranscribe
+                                    ? 'Seleccioná proveedor y modelo arriba'
+                                    : 'Reintentar con el modelo seleccionado'
+                              }
+                              class="min-h-[44px] px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50 shadow-md shadow-primary/10"
+                            >
+                              {retryingId === t.id ? (
+                                <>
+                                  <RefreshCw class="w-4 h-4 animate-spin" />
+                                  Reintentando…
+                                </>
+                              ) : (
+                                <>
+                                  <RotateCcw class="w-4 h-4" />
+                                  Reintentar transcripción
+                                </>
+                              )}
+                            </button>
+                            <p class="text-[11px] text-gray-500">
+                              Usa el proveedor/modelo elegidos arriba
+                              {selectedProvider && selectedModel
+                                ? `: ${providerLabel(selectedProvider) || selectedProvider} · ${selectedModel.split('/').pop()}`
+                                : '.'}
+                            </p>
+                          </div>
                         </div>
                       ) : (
                         <div class="space-y-4">
