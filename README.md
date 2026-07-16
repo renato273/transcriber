@@ -93,8 +93,9 @@ pnpm --filter @transcriber/database build
 pnpm --filter @transcriber/ai-services build
 
 # Dev server → http://localhost:4321
-# Desde otro dispositivo en la misma red → http://TU_IP_LAN:4321
-pnpm dev
+# Desde el celular (misma Wi‑Fi) con micrófono → HTTPS obligatorio:
+pnpm --filter @transcriber/web run dev:lan
+# Abrí https://TU_IP_LAN:4321 y aceptá el certificado autofirmado.
 ```
 
 En Windows, si no carga desde el celular/otra PC, permití el puerto en el Firewall (primera vez que escucha en la red):
@@ -104,6 +105,8 @@ New-NetFirewallRule -DisplayName "Transcriber Astro Dev" -Direction Inbound -Pro
 ```
 
 Para ver tu IP local: `ipconfig` (buscá IPv4 de Wi‑Fi/Ethernet).
+
+> **Micrófono en móvil:** los navegadores bloquean `getUserMedia` en `http://192.168.x.x`. Hay que usar `dev:lan` (HTTPS) o subir archivos de audio en su lugar.
 
 Alternativa de migración en desarrollo:
 

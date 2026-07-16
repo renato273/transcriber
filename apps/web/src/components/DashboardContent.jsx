@@ -230,21 +230,57 @@ export default function DashboardContent() {
       toast.error('Selecciona un modelo free antes de grabar.');
       return;
     }
+
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      toast.error(
+        'El micrófono requiere HTTPS. En la PC ejecutá "pnpm --filter @transcriber/web dev:lan" y abrí https://TU_IP:4321 en el celular (aceptá el aviso del certificado).'
+      );
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast.error('Este navegador no permite acceso al micrófono.');
+      return;
+    }
+
     setRecordingTime(0);
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+
+      const mimeType = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/aac',
+        'audio/ogg',
+      ].find((t) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t));
+
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
 
       const chunks = [];
+      const blobType = mimeType || 'audio/webm';
+      const ext = blobType.includes('mp4') || blobType.includes('aac')
+        ? 'mp4'
+        : blobType.includes('ogg')
+          ? 'ogg'
+          : 'webm';
+
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.push(e.data);
       };
 
       recorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        await handleAudioUpload(blob, 'grabacion.webm');
-        stream.getTracks().forEach(track => track.stop());
+        const blob = new Blob(chunks, { type: blobType });
+        await handleAudioUpload(blob, `grabacion.${ext}`);
+        stream.getTracks().forEach((track) => track.stop());
       };
 
       recorder.start();
@@ -252,7 +288,17 @@ export default function DashboardContent() {
       setIsRecording(true);
       setIsPaused(false);
     } catch (err) {
-      toast.error('No se pudo acceder al micrófono. Verifica los permisos.');
+      const name = err?.name || '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        toast.error('Permiso de micrófono denegado. Activalo en los ajustes del navegador/sistema.');
+      } else if (name === 'NotFoundError') {
+        toast.error('No se encontró un micrófono en este dispositivo.');
+      } else if (!window.isSecureContext) {
+        toast.error('El micrófono requiere HTTPS. Usá https:// en la URL del celular.');
+      } else {
+        toast.error('No se pudo acceder al micrófono. Verifica los permisos.');
+      }
+      console.error('getUserMedia error:', err);
     }
   };
 

@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm exec dotenv -e .env -- turbo run dev",
+    "dev:lan": "pnpm exec dotenv -e .env -- pnpm --filter @transcriber/web run dev:lan",
     "build": "turbo run build",
     "db:generate": "pnpm --filter database db:generate",
     "db:migrate": "pnpm --filter database db:migrate",

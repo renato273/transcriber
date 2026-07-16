@@ -5,18 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev --host 0.0.0.0 --port 4321",
+    "dev:lan": "cross-env DEV_HTTPS=true astro dev --host 0.0.0.0 --port 4321",
     "start": "astro dev --host 0.0.0.0 --port 4321",
     "build": "astro build",
     "preview": "astro preview --host 0.0.0.0 --port 4321",
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/node": "^8.0.0",
     "@astrojs/react": "^4.0.0",
     "@astrojs/tailwind": "^5.0.0",
-    "@astrojs/node": "^8.0.0",
-    "@transcriber/database": "workspace:*",
     "@prisma/client": "^5.0.0",
     "@transcriber/ai-services": "workspace:*",
+    "@transcriber/database": "workspace:*",
     "astro": "^4.0.0",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.3.1",
@@ -30,6 +31,8 @@
     "@types/bcryptjs": "^2.4.2",
     "@types/jsonwebtoken": "^9.0.2",
     "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0"
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "cross-env": "^10.1.0"
   }
 }
