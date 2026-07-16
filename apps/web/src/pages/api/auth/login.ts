@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { prisma } from '@transcriber/database';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { sessionCookieOptions } from '../../../lib/cookies.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
 
@@ -61,14 +62,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Create JWT
     const token = jwt.sign({ sessionId: session.id }, JWT_SECRET, { expiresIn: '7d' });
 
-    // Set cookie
-    cookies.set('session_id', token, {
-      path: '/',
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      expires: expiresAt
-    });
+    // Set cookie (Secure solo en HTTPS; en LAN HTTP no se usa Secure)
+    cookies.set('session_id', token, sessionCookieOptions(request, expiresAt));
 
     return new Response(JSON.stringify({
       success: true,
