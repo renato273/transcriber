@@ -43,6 +43,7 @@ Creá un `.env` en la **raíz** del repo (no lo subas a Git).
 | `DATABASE_URL` | Sí | Connection string PostgreSQL |
 | `JWT_SECRET` | Sí | Secreto para firmar cookies de sesión |
 | `ENCRYPTION_KEY` | Sí | Clave para cifrar API keys en la BD. **Si la cambiás, hay que volver a guardar las API keys en Admin** |
+| `COOKIE_SECURE` | No | `false` en HTTP/LAN. `true` solo con HTTPS. Si falta, se detecta por el protocolo de la request |
 | `AUDIO_STORAGE_PATH` | No | Carpeta de audios (default `./storage/audio`; en Docker: `/app/storage/audio`) |
 | `HOST` | No | En Docker/producción: `0.0.0.0` |
 | `PORT` | No | Puerto HTTP (default contenedor: `4321`) |
@@ -54,12 +55,14 @@ Ejemplo:
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/transcriber"
 JWT_SECRET="cambia-este-secreto-largo"
 ENCRYPTION_KEY="cambia-esta-clave-de-cifrado"
+COOKIE_SECURE=false
 AUDIO_STORAGE_PATH="./storage/audio"
 HOST=0.0.0.0
 PORT=4321
 NODE_ENV=production
 ```
 
+> En acceso por IP/LAN (`http://192.168.x.x`) dejá `COOKIE_SECURE=false`. Con `true` (o cookie Secure forzada) el login parece OK pero no guarda la sesión.
 > Las API keys de Gemini/NVIDIA/etc. **no van en el `.env`**: se configuran en la UI de administración y se guardan cifradas en la base.
 
 ---
@@ -90,8 +93,20 @@ pnpm --filter @transcriber/database build
 pnpm --filter @transcriber/ai-services build
 
 # Dev server → http://localhost:4321
-pnpm dev
+# Desde el celular (misma Wi‑Fi) con micrófono → HTTPS obligatorio:
+pnpm --filter @transcriber/web run dev:lan
+# Abrí https://TU_IP_LAN:4321 y aceptá el certificado autofirmado.
 ```
+
+En Windows, si no carga desde el celular/otra PC, permití el puerto en el Firewall (primera vez que escucha en la red):
+
+```powershell
+New-NetFirewallRule -DisplayName "Transcriber Astro Dev" -Direction Inbound -Protocol TCP -LocalPort 4321 -Action Allow
+```
+
+Para ver tu IP local: `ipconfig` (buscá IPv4 de Wi‑Fi/Ethernet).
+
+> **Micrófono en móvil:** los navegadores bloquean `getUserMedia` en `http://192.168.x.x`. Hay que usar `dev:lan` (HTTPS) o subir archivos de audio en su lugar.
 
 Alternativa de migración en desarrollo:
 
