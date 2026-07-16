@@ -103,6 +103,9 @@ importers:
       '@prisma/client':
         specifier: ^5.0.0
         version: 5.22.0(prisma@5.22.0)
+      prisma:
+        specifier: ^5.0.0
+        version: 5.22.0
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -110,9 +113,6 @@ importers:
       dotenv-cli:
         specifier: ^7.0.0
         version: 7.4.4
-      prisma:
-        specifier: ^5.0.0
-        version: 5.22.0
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
