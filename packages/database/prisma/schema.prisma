@@ -79,8 +79,6 @@ model TranscriptionSession {
   id             String          @id @default(uuid())
   userId         String
   title          String          // Nombre descriptivo (ej: "Clase de Programación 1")
-  summary        String?         @db.Text
-  summaryProvider ProviderType?
   isFavorite     Boolean         @default(false)
   tags           String[]        @default([])
   createdAt      DateTime        @default(now())
@@ -106,6 +104,8 @@ model Transcription {
   audioPath    String?             // Ruta local del archivo (ej: "/storage/audio/xxxx.webm")
   status       TranscriptionStatus @default(PENDING)
   originalText String?             @db.Text
+  summary      String?             @db.Text
+  summaryProvider ProviderType?
   language     String              @default("es") // Idioma detectado u original
   duration     Float?              // Duración del audio en segundos
   errorMessage String?             // Registro en caso de fallo

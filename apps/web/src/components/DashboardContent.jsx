@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Upload, Trash2, Plus, Volume2, Globe, AlertCircle, Loader, Cpu, RefreshCw, Play, Copy, Check, RotateCcw, Sparkles, Download, Star, Pencil, Tag, X, KeyRound } from 'lucide-react';
+import { Mic, Upload, Trash2, Plus, Volume2, Globe, AlertCircle, Loader, Cpu, RefreshCw, Play, Copy, Check, RotateCcw, Sparkles, Download, Star, Pencil, Tag, X, KeyRound, Save } from 'lucide-react';
 import { toast, confirmDialog } from './alerts';
 import PasswordChecklist from './PasswordChecklist.jsx';
 import { isPasswordValid } from '../lib/password.js';
@@ -36,7 +36,10 @@ export default function DashboardContent() {
   const [loadingModels, setLoadingModels] = useState(false);
 
   const [translatingId, setTranslatingId] = useState(null);
-  const [summarizing, setSummarizing] = useState(false);
+  const [summarizingId, setSummarizingId] = useState(null);
+  const [editingTranscriptionId, setEditingTranscriptionId] = useState(null);
+  const [transcriptionDraft, setTranscriptionDraft] = useState('');
+  const [savingTranscriptionId, setSavingTranscriptionId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [retryingId, setRetryingId] = useState(null);
   const [targetLanguages, setTargetLanguages] = useState({});
@@ -496,35 +499,65 @@ export default function DashboardContent() {
     }
   };
 
-  const handleSummarize = async () => {
-    if (!activeSession) return;
-    setSummarizing(true);
+  const handleSummarize = async (transcriptionId) => {
+    setSummarizingId(transcriptionId);
 
     try {
-      const res = await fetch(`/api/sessions/${activeSession.id}/summary`, { method: 'POST' });
+      const res = await fetch(`/api/transcriptions/${transcriptionId}/summary`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) {
         toast.error(data.error || 'No se pudo generar el resumen');
         return;
       }
 
-      setActiveSession((previous) => ({ ...previous, ...data.session }));
-      setSessions((previous) =>
-        previous.map((session) =>
-          session.id === data.session.id ? { ...session, ...data.session } : session
-        )
-      );
+      setTranscriptions((previous) => previous.map((item) =>
+        item.id === data.transcription.id ? { ...item, ...data.transcription } : item
+      ));
       toast.success('Resumen generado');
     } catch {
       toast.error('Error al conectar con el servidor');
     } finally {
-      setSummarizing(false);
+      setSummarizingId(null);
     }
   };
 
-  const handleExport = (format) => {
-    if (!activeSession) return;
-    window.location.assign(`/api/sessions/${activeSession.id}/export?format=${format}`);
+  const handleExport = (transcriptionId, format) => {
+    window.location.assign(`/api/transcriptions/${transcriptionId}/export?format=${format}`);
+  };
+
+  const startEditingTranscription = (transcription) => {
+    setEditingTranscriptionId(transcription.id);
+    setTranscriptionDraft(transcription.originalText || '');
+  };
+
+  const cancelEditingTranscription = () => {
+    setEditingTranscriptionId(null);
+    setTranscriptionDraft('');
+  };
+
+  const saveTranscription = async (transcriptionId) => {
+    setSavingTranscriptionId(transcriptionId);
+    try {
+      const res = await fetch(`/api/transcriptions/${transcriptionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ originalText: transcriptionDraft }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'No se pudo guardar la transcripción');
+        return;
+      }
+      setTranscriptions((previous) => previous.map((item) =>
+        item.id === transcriptionId ? { ...item, ...data.transcription } : item
+      ));
+      cancelEditingTranscription();
+      toast.success('Transcripción guardada');
+    } catch {
+      toast.error('Error al conectar con el servidor');
+    } finally {
+      setSavingTranscriptionId(null);
+    }
   };
 
   const updateActiveSession = async (changes) => {
@@ -753,44 +786,7 @@ export default function DashboardContent() {
                     </form>
                   </div>
                 </div>
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleExport('txt')}
-                    disabled={transcriptions.every((t) => t.status !== 'COMPLETED' || !t.originalText)}
-                    class="min-h-[40px] px-3 py-2 border border-[#1F293D] hover:bg-[#1E2942] text-gray-200 rounded-lg text-xs font-semibold flex items-center gap-2 disabled:opacity-50"
-                    title="Descargar texto plano"
-                  >
-                    <Download class="w-4 h-4" /> TXT
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleExport('srt')}
-                    disabled={transcriptions.every((t) => t.status !== 'COMPLETED' || !t.originalText)}
-                    class="min-h-[40px] px-3 py-2 border border-[#1F293D] hover:bg-[#1E2942] text-gray-200 rounded-lg text-xs font-semibold flex items-center gap-2 disabled:opacity-50"
-                    title="Descargar subtítulos"
-                  >
-                    <Download class="w-4 h-4" /> SRT
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSummarize}
-                    disabled={summarizing || transcriptions.every((t) => t.status !== 'COMPLETED' || !t.originalText)}
-                    class="min-h-[40px] px-3 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg text-xs font-semibold flex items-center gap-2 disabled:opacity-50"
-                  >
-                    <Sparkles class={`w-4 h-4 ${summarizing ? 'animate-pulse' : ''}`} />
-                    {summarizing ? 'Generando...' : activeSession.summary ? 'Regenerar resumen' : 'Generar resumen'}
-                  </button>
-                </div>
               </div>
-              {activeSession.summary && (
-                <div class="mt-4 p-3 sm:p-4 bg-primary/5 border border-primary/20 rounded-xl">
-                  <div class="flex items-center gap-2 text-xs font-bold text-primary-light uppercase tracking-wider mb-2">
-                    <Sparkles class="w-3.5 h-3.5" /> Resumen IA
-                  </div>
-                  <p class="text-sm text-gray-200 whitespace-pre-wrap break-words leading-relaxed">{activeSession.summary}</p>
-                </div>
-              )}
               <div class="mt-4">
                 <button
                   type="button"
@@ -1126,27 +1122,36 @@ export default function DashboardContent() {
                           <div>
                             <div class="flex items-center justify-between gap-2 mb-1">
                               <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Texto Original</span>
-                              {t.originalText && (
-                                <button
-                                  type="button"
-                                  onClick={() => copyToClipboard(t.originalText, `orig-${t.id}`, 'Transcripción')}
-                                  class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-gray-400 hover:text-white hover:bg-[#1E2942] border border-transparent hover:border-[#1F293D] transition-all"
-                                  title="Copiar transcripción"
-                                  aria-label="Copiar transcripción"
-                                >
-                                  {copiedKey === `orig-${t.id}` ? (
-                                    <Check class="w-3.5 h-3.5 text-green-400" />
-                                  ) : (
-                                    <Copy class="w-3.5 h-3.5" />
-                                  )}
-                                  {copiedKey === `orig-${t.id}` ? 'Copiado' : 'Copiar'}
-                                </button>
-                              )}
+                              <div class="flex items-center gap-1">
+                                {t.originalText && editingTranscriptionId !== t.id && (
+                                  <button type="button" onClick={() => copyToClipboard(t.originalText, `orig-${t.id}`, 'Transcripción')} class="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#1E2942]" title="Copiar transcripción" aria-label="Copiar transcripción">
+                                    {copiedKey === `orig-${t.id}` ? <Check class="w-3.5 h-3.5 text-green-400" /> : <Copy class="w-3.5 h-3.5" />}
+                                  </button>
+                                )}
+                                {t.status === 'COMPLETED' && editingTranscriptionId !== t.id && (
+                                  <button type="button" onClick={() => startEditingTranscription(t)} class="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#1E2942]" title="Editar transcripción" aria-label="Editar transcripción"><Pencil class="w-3.5 h-3.5" /></button>
+                                )}
+                              </div>
                             </div>
-                            <p class="text-sm text-gray-200 bg-[#0E1524]/60 p-3 sm:p-4 border border-[#1F293D]/50 rounded-xl leading-relaxed whitespace-pre-wrap break-words">
-                              {t.originalText || 'Transcribiendo audio...'}
-                            </p>
+                            {editingTranscriptionId === t.id ? (
+                              <div class="space-y-2">
+                                <textarea value={transcriptionDraft} onChange={(e) => setTranscriptionDraft(e.target.value)} rows="8" class="w-full resize-y rounded-xl border border-primary/40 bg-[#0E1524]/80 p-3 text-sm leading-relaxed text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary" aria-label="Editar texto de transcripción" />
+                                <div class="flex justify-end gap-2">
+                                  <button type="button" onClick={cancelEditingTranscription} disabled={savingTranscriptionId === t.id} class="p-2 rounded-lg text-gray-400 hover:bg-[#1E2942]" title="Cancelar edición"><X class="w-4 h-4" /></button>
+                                  <button type="button" onClick={() => saveTranscription(t.id)} disabled={savingTranscriptionId === t.id} class="min-h-[36px] px-3 rounded-lg bg-primary text-sm font-semibold text-white disabled:opacity-50 flex items-center gap-1.5"><Save class="w-3.5 h-3.5" />{savingTranscriptionId === t.id ? 'Guardando...' : 'Guardar'}</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p class="text-sm text-gray-200 bg-[#0E1524]/60 p-3 sm:p-4 border border-[#1F293D]/50 rounded-xl leading-relaxed whitespace-pre-wrap break-words">{t.originalText || 'Transcribiendo audio...'}</p>
+                            )}
                           </div>
+
+                          {t.summary && (
+                            <div class="p-3 sm:p-4 bg-primary/5 border border-primary/20 rounded-xl">
+                              <div class="flex items-center gap-2 text-xs font-bold text-primary-light uppercase tracking-wider mb-2"><Sparkles class="w-3.5 h-3.5" /> Resumen IA</div>
+                              <p class="text-sm text-gray-200 whitespace-pre-wrap break-words leading-relaxed">{t.summary}</p>
+                            </div>
+                          )}
 
                           {t.translations && t.translations.length > 0 && (
                             <div class="grid grid-cols-1 gap-3 sm:gap-4">
@@ -1188,7 +1193,13 @@ export default function DashboardContent() {
                           )}
 
                           {t.status === 'COMPLETED' && (
-                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3 border-t border-[#1F293D]/50 pt-3">
+                            <div class="flex flex-col gap-3 border-t border-[#1F293D]/50 pt-3">
+                              <div class="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => handleExport(t.id, 'txt')} disabled={!t.originalText} class="min-h-[36px] px-3 border border-[#1F293D] hover:bg-[#1E2942] rounded-lg text-xs font-semibold text-gray-200 flex items-center gap-1.5 disabled:opacity-50"><Download class="w-3.5 h-3.5" /> TXT</button>
+                                <button type="button" onClick={() => handleExport(t.id, 'srt')} disabled={!t.originalText} class="min-h-[36px] px-3 border border-[#1F293D] hover:bg-[#1E2942] rounded-lg text-xs font-semibold text-gray-200 flex items-center gap-1.5 disabled:opacity-50"><Download class="w-3.5 h-3.5" /> SRT</button>
+                                <button type="button" onClick={() => handleSummarize(t.id)} disabled={!t.originalText || summarizingId === t.id} class="min-h-[36px] px-3 bg-primary hover:bg-primary-dark rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 disabled:opacity-50"><Sparkles class={`w-3.5 h-3.5 ${summarizingId === t.id ? 'animate-pulse' : ''}`} />{summarizingId === t.id ? 'Generando...' : t.summary ? 'Regenerar resumen' : 'Generar resumen'}</button>
+                              </div>
+                              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3">
                               <span class="text-xs text-gray-400 flex items-center gap-1">
                                 <Globe class="w-3.5 h-3.5" /> Traducir a
                               </span>
@@ -1219,6 +1230,7 @@ export default function DashboardContent() {
                                   )}
                                 </button>
                               </div>
+                            </div>
                             </div>
                           )}
                         </div>
