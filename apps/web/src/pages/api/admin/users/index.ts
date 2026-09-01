@@ -72,7 +72,7 @@ export const GET: APIRoute = async ({ locals }) => {
 
 /**
  * PATCH /api/admin/users
- * Body: { userId, role?: 'ADMIN'|'USER', isActive?: boolean }
+ * Body: { userId, email?: string, role?: 'ADMIN'|'USER', isActive?: boolean }
  */
 export const PATCH: APIRoute = async ({ request, locals }) => {
   const denied = requireAdmin(locals.user);
@@ -83,6 +83,7 @@ export const PATCH: APIRoute = async ({ request, locals }) => {
   try {
     const body = await request.json();
     const userId = body?.userId as string | undefined;
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : undefined;
     const role = body?.role as string | undefined;
     const hasIsActive = typeof body?.isActive === 'boolean';
     const isActive = hasIsActive ? (body.isActive as boolean) : undefined;
@@ -101,9 +102,16 @@ export const PATCH: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    if (role === undefined && !hasIsActive) {
+    if (email !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return new Response(JSON.stringify({ error: 'Email inválido.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (email === undefined && role === undefined && !hasIsActive) {
       return new Response(
-        JSON.stringify({ error: 'Envía role y/o isActive para actualizar.' }),
+        JSON.stringify({ error: 'Envía email, role y/o isActive para actualizar.' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -138,7 +146,17 @@ export const PATCH: APIRoute = async ({ request, locals }) => {
       }
     }
 
-    const data: { role?: 'ADMIN' | 'USER'; isActive?: boolean } = {};
+    const data: { email?: string; role?: 'ADMIN' | 'USER'; isActive?: boolean } = {};
+    if (email !== undefined && email !== target.email) {
+      const emailInUse = await prisma.user.findUnique({ where: { email } });
+      if (emailInUse) {
+        return new Response(JSON.stringify({ error: 'Ese correo ya está en uso.' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      data.email = email;
+    }
     if (role !== undefined && role !== target.role) {
       data.role = role as 'ADMIN' | 'USER';
     }

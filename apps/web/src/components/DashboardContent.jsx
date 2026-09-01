@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Upload, Trash2, Plus, Volume2, Globe, AlertCircle, Loader, Cpu, RefreshCw, Play, Copy, Check, RotateCcw, Sparkles, Download, Star, Pencil, Tag, X } from 'lucide-react';
+import { Mic, Upload, Trash2, Plus, Volume2, Globe, AlertCircle, Loader, Cpu, RefreshCw, Play, Copy, Check, RotateCcw, Sparkles, Download, Star, Pencil, Tag, X, KeyRound } from 'lucide-react';
 import { toast, confirmDialog } from './alerts';
+import PasswordChecklist from './PasswordChecklist.jsx';
+import { isPasswordValid } from '../lib/password.js';
 
 export default function DashboardContent() {
   const [sessions, setSessions] = useState([]);
@@ -9,6 +11,11 @@ export default function DashboardContent() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [sessionTitleDraft, setSessionTitleDraft] = useState('');
   const [tagDraft, setTagDraft] = useState('');
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
   const [transcriptions, setTranscriptions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [loadingTranscriptions, setLoadingTranscriptions] = useState(false);
@@ -563,6 +570,38 @@ export default function DashboardContent() {
 
   const removeTag = (tag) => updateActiveSession({ tags: activeSession.tags.filter((item) => item !== tag) });
 
+  const changePassword = async (e) => {
+    e.preventDefault();
+    if (!isPasswordValid(newPassword)) {
+      toast.error('La nueva contraseña no cumple todos los requisitos.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      toast.error('Las contraseñas nuevas no coinciden.');
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, password: newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'No se pudo actualizar la contraseña.');
+        return;
+      }
+      toast.success(data.message || 'Contraseña actualizada.');
+      window.location.href = '/login';
+    } catch {
+      toast.error('Error al conectar con el servidor.');
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   const handleLangChange = (id, lang) => {
     setTargetLanguages(prev => ({ ...prev, [id]: lang }));
   };
@@ -752,6 +791,36 @@ export default function DashboardContent() {
                   <p class="text-sm text-gray-200 whitespace-pre-wrap break-words leading-relaxed">{activeSession.summary}</p>
                 </div>
               )}
+              <div class="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setPasswordOpen((open) => !open)}
+                  class={`min-h-[36px] px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 border ${passwordOpen ? 'border-primary/40 bg-primary/10 text-primary-light' : 'border-[#1F293D] text-gray-300 hover:bg-[#1E2942]'}`}
+                >
+                  <KeyRound class="w-3.5 h-3.5" />
+                  {passwordOpen ? 'Cerrar cambio de contraseña' : 'Cambiar contraseña'}
+                </button>
+                {passwordOpen && (
+                  <form onSubmit={changePassword} class="mt-3 max-w-lg space-y-3 rounded-xl border border-[#1F293D] bg-[#0E1524]/70 p-3 sm:p-4">
+                    <div>
+                      <label class="block text-xs font-medium text-gray-300 mb-1" for="currentPassword">Contraseña actual</label>
+                      <input id="currentPassword" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required autocomplete="current-password" class="w-full rounded-lg border border-[#1F293D] bg-[#0B0F19] px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-gray-300 mb-1" for="newPassword">Nueva contraseña</label>
+                      <input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required autocomplete="new-password" class="w-full rounded-lg border border-[#1F293D] bg-[#0B0F19] px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary" />
+                      <PasswordChecklist password={newPassword} />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-gray-300 mb-1" for="confirmNewPassword">Confirmar nueva contraseña</label>
+                      <input id="confirmNewPassword" type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} required autocomplete="new-password" class="w-full rounded-lg border border-[#1F293D] bg-[#0B0F19] px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary" />
+                    </div>
+                    <button type="submit" disabled={savingPassword} class="min-h-[40px] px-3 py-2 rounded-lg bg-primary hover:bg-primary-dark text-sm font-semibold text-white disabled:opacity-50">
+                      {savingPassword ? 'Guardando...' : 'Actualizar contraseña'}
+                    </button>
+                  </form>
+                )}
+              </div>
             </div>
 
             <div class="mb-4 sm:mb-6 p-3 sm:p-4 bg-[#151D30]/50 border border-[#1F293D] rounded-2xl space-y-3">
