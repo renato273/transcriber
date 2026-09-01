@@ -10,4 +10,5 @@ export * from './listModels.js';
 export interface AIServiceInterface {
   transcribeAudio(filePath: string, mimeType?: string, modelId?: string): Promise<string>;
   translateText(text: string, targetLang: string, modelId?: string): Promise<string>;
+  summarizeText(text: string, modelId?: string): Promise<string>;
 }

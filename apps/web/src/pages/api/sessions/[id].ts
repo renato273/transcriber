@@ -63,6 +63,52 @@ export const GET: APIRoute = async ({ params, locals }) => {
   }
 };
 
+export const PATCH: APIRoute = async ({ params, request, locals }) => {
+  const user = locals.user;
+  const sessionId = params.id;
+
+  if (!user) {
+    return Response.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
+  if (!sessionId) {
+    return Response.json({ error: 'ID de sesión requerido' }, { status: 400 });
+  }
+
+  try {
+    const body = await request.json();
+    const data: { title?: string; isFavorite?: boolean; tags?: string[] } = {};
+
+    if (typeof body.title === 'string') {
+      const title = body.title.trim();
+      if (!title) return Response.json({ error: 'Título requerido' }, { status: 400 });
+      data.title = title;
+    }
+    if (typeof body.isFavorite === 'boolean') data.isFavorite = body.isFavorite;
+    if (Array.isArray(body.tags)) {
+      data.tags = [...new Set(body.tags.map((tag: unknown) => String(tag).trim()).filter(Boolean))].slice(0, 12);
+    }
+
+    if (!Object.keys(data).length) {
+      return Response.json({ error: 'No hay cambios para guardar' }, { status: 400 });
+    }
+
+    const session = await prisma.transcriptionSession.findFirst({
+      where: { id: sessionId, userId: user.id },
+      select: { id: true },
+    });
+    if (!session) return Response.json({ error: 'Sesión no encontrada' }, { status: 404 });
+
+    const updatedSession = await prisma.transcriptionSession.update({
+      where: { id: session.id },
+      data,
+    });
+    return Response.json(updatedSession);
+  } catch (error: any) {
+    return Response.json({ error: error.message || 'No se pudo actualizar la sesión' }, { status: 500 });
+  }
+};
+
 export const DELETE: APIRoute = async ({ params, locals }) => {
   const user = locals.user;
   const sessionId = params.id;

@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Upload, Trash2, Plus, Volume2, Globe, AlertCircle, Loader, Cpu, RefreshCw, Play, Copy, Check, RotateCcw } from 'lucide-react';
+import { Mic, Upload, Trash2, Plus, Volume2, Globe, AlertCircle, Loader, Cpu, RefreshCw, Play, Copy, Check, RotateCcw, Sparkles, Download, Star, Pencil, Tag, X } from 'lucide-react';
 import { toast, confirmDialog } from './alerts';
 
 export default function DashboardContent() {
   const [sessions, setSessions] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
   const [newSessionTitle, setNewSessionTitle] = useState('');
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [sessionTitleDraft, setSessionTitleDraft] = useState('');
+  const [tagDraft, setTagDraft] = useState('');
   const [transcriptions, setTranscriptions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [loadingTranscriptions, setLoadingTranscriptions] = useState(false);
@@ -26,6 +29,7 @@ export default function DashboardContent() {
   const [loadingModels, setLoadingModels] = useState(false);
 
   const [translatingId, setTranslatingId] = useState(null);
+  const [summarizing, setSummarizing] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [retryingId, setRetryingId] = useState(null);
   const [targetLanguages, setTargetLanguages] = useState({});
@@ -46,6 +50,12 @@ export default function DashboardContent() {
       setTranscriptions([]);
     }
   }, [activeSession]);
+
+  useEffect(() => {
+    setSessionTitleDraft(activeSession?.title || '');
+    setEditingTitle(false);
+    setTagDraft('');
+  }, [activeSession?.id]);
 
   useEffect(() => {
     if (selectedProvider) {
@@ -479,6 +489,80 @@ export default function DashboardContent() {
     }
   };
 
+  const handleSummarize = async () => {
+    if (!activeSession) return;
+    setSummarizing(true);
+
+    try {
+      const res = await fetch(`/api/sessions/${activeSession.id}/summary`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'No se pudo generar el resumen');
+        return;
+      }
+
+      setActiveSession((previous) => ({ ...previous, ...data.session }));
+      setSessions((previous) =>
+        previous.map((session) =>
+          session.id === data.session.id ? { ...session, ...data.session } : session
+        )
+      );
+      toast.success('Resumen generado');
+    } catch {
+      toast.error('Error al conectar con el servidor');
+    } finally {
+      setSummarizing(false);
+    }
+  };
+
+  const handleExport = (format) => {
+    if (!activeSession) return;
+    window.location.assign(`/api/sessions/${activeSession.id}/export?format=${format}`);
+  };
+
+  const updateActiveSession = async (changes) => {
+    if (!activeSession) return false;
+    try {
+      const res = await fetch(`/api/sessions/${activeSession.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(changes),
+      });
+      const updated = await res.json();
+      if (!res.ok) {
+        toast.error(updated.error || 'No se pudo actualizar la sesión');
+        return false;
+      }
+      setActiveSession(updated);
+      setSessions((previous) => previous.map((session) => session.id === updated.id ? updated : session));
+      return true;
+    } catch {
+      toast.error('Error al conectar con el servidor');
+      return false;
+    }
+  };
+
+  const saveSessionTitle = async (e) => {
+    e.preventDefault();
+    if (await updateActiveSession({ title: sessionTitleDraft })) {
+      setEditingTitle(false);
+      toast.success('Título actualizado');
+    }
+  };
+
+  const toggleFavorite = () => updateActiveSession({ isFavorite: !activeSession.isFavorite });
+
+  const addTag = async (e) => {
+    e.preventDefault();
+    const tag = tagDraft.trim();
+    if (!tag || activeSession.tags?.includes(tag)) return;
+    if (await updateActiveSession({ tags: [...(activeSession.tags || []), tag] })) {
+      setTagDraft('');
+    }
+  };
+
+  const removeTag = (tag) => updateActiveSession({ tags: activeSession.tags.filter((item) => item !== tag) });
+
   const handleLangChange = (id, lang) => {
     setTargetLanguages(prev => ({ ...prev, [id]: lang }));
   };
@@ -573,7 +657,10 @@ export default function DashboardContent() {
                       : 'border-transparent text-gray-400 hover:bg-[#151D30] hover:text-white'
                   }`}
                 >
-                  <span class="truncate text-sm pr-2">{s.title}</span>
+                  <span class="truncate text-sm pr-2 flex items-center gap-1.5">
+                    {s.isFavorite && <Star class="w-3.5 h-3.5 text-amber-300 fill-amber-300 shrink-0" />}
+                    {s.title}
+                  </span>
                   <button
                     onClick={(e) => deleteSession(s.id, e)}
                     class="p-2 text-gray-500 hover:text-red-400 rounded-lg transition-all shrink-0"
@@ -592,8 +679,79 @@ export default function DashboardContent() {
         {activeSession ? (
           <>
             <div class="border-b border-[#1F293D] pb-3 sm:pb-4 mb-4 sm:mb-6">
-              <h1 class="text-xl sm:text-2xl font-bold text-white break-words">{activeSession.title}</h1>
-              <p class="text-[10px] sm:text-xs text-gray-400 font-mono mt-1 truncate">ID: {activeSession.id}</p>
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="min-w-0 flex-grow">
+                  {editingTitle ? (
+                    <form onSubmit={saveSessionTitle} class="flex gap-2">
+                      <input
+                        value={sessionTitleDraft}
+                        onChange={(e) => setSessionTitleDraft(e.target.value)}
+                        class="min-w-0 flex-grow px-3 py-2 bg-[#0E1524] border border-primary rounded-lg text-xl font-bold text-white focus:outline-none"
+                        aria-label="Título de la sesión"
+                        autoFocus
+                      />
+                      <button type="submit" class="p-2 text-green-400 hover:bg-green-950/30 rounded-lg" title="Guardar título"><Check class="w-5 h-5" /></button>
+                      <button type="button" onClick={() => setEditingTitle(false)} class="p-2 text-gray-400 hover:bg-[#1E2942] rounded-lg" title="Cancelar edición"><X class="w-5 h-5" /></button>
+                    </form>
+                  ) : (
+                    <div class="flex items-center gap-2">
+                      <h1 class="text-xl sm:text-2xl font-bold text-white break-words">{activeSession.title}</h1>
+                      <button type="button" onClick={() => setEditingTitle(true)} class="p-1.5 text-gray-400 hover:text-white hover:bg-[#1E2942] rounded-lg" title="Editar título"><Pencil class="w-4 h-4" /></button>
+                      <button type="button" onClick={toggleFavorite} class={`p-1.5 rounded-lg hover:bg-[#1E2942] ${activeSession.isFavorite ? 'text-amber-300' : 'text-gray-400 hover:text-amber-300'}`} title={activeSession.isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}><Star class={`w-4 h-4 ${activeSession.isFavorite ? 'fill-current' : ''}`} /></button>
+                    </div>
+                  )}
+                  <p class="text-[10px] sm:text-xs text-gray-400 font-mono mt-1 truncate">ID: {activeSession.id}</p>
+                  <div class="mt-3 flex flex-wrap items-center gap-1.5">
+                    {activeSession.tags?.map((tag) => (
+                      <span key={tag} class="inline-flex items-center gap-1 rounded-md bg-accent/10 border border-accent/20 px-2 py-1 text-xs text-accent-light">
+                        {tag}
+                        <button type="button" onClick={() => removeTag(tag)} class="hover:text-white" title={`Quitar etiqueta ${tag}`}><X class="w-3 h-3" /></button>
+                      </span>
+                    ))}
+                    <form onSubmit={addTag} class="flex items-center gap-1">
+                      <Tag class="w-3.5 h-3.5 text-gray-500" />
+                      <input value={tagDraft} onChange={(e) => setTagDraft(e.target.value)} placeholder="Etiqueta" class="w-24 bg-transparent border-b border-[#1F293D] px-1 py-1 text-xs text-gray-200 outline-none focus:border-primary" aria-label="Nueva etiqueta" />
+                    </form>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleExport('txt')}
+                    disabled={transcriptions.every((t) => t.status !== 'COMPLETED' || !t.originalText)}
+                    class="min-h-[40px] px-3 py-2 border border-[#1F293D] hover:bg-[#1E2942] text-gray-200 rounded-lg text-xs font-semibold flex items-center gap-2 disabled:opacity-50"
+                    title="Descargar texto plano"
+                  >
+                    <Download class="w-4 h-4" /> TXT
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExport('srt')}
+                    disabled={transcriptions.every((t) => t.status !== 'COMPLETED' || !t.originalText)}
+                    class="min-h-[40px] px-3 py-2 border border-[#1F293D] hover:bg-[#1E2942] text-gray-200 rounded-lg text-xs font-semibold flex items-center gap-2 disabled:opacity-50"
+                    title="Descargar subtítulos"
+                  >
+                    <Download class="w-4 h-4" /> SRT
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSummarize}
+                    disabled={summarizing || transcriptions.every((t) => t.status !== 'COMPLETED' || !t.originalText)}
+                    class="min-h-[40px] px-3 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg text-xs font-semibold flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <Sparkles class={`w-4 h-4 ${summarizing ? 'animate-pulse' : ''}`} />
+                    {summarizing ? 'Generando...' : activeSession.summary ? 'Regenerar resumen' : 'Generar resumen'}
+                  </button>
+                </div>
+              </div>
+              {activeSession.summary && (
+                <div class="mt-4 p-3 sm:p-4 bg-primary/5 border border-primary/20 rounded-xl">
+                  <div class="flex items-center gap-2 text-xs font-bold text-primary-light uppercase tracking-wider mb-2">
+                    <Sparkles class="w-3.5 h-3.5" /> Resumen IA
+                  </div>
+                  <p class="text-sm text-gray-200 whitespace-pre-wrap break-words leading-relaxed">{activeSession.summary}</p>
+                </div>
+              )}
             </div>
 
             <div class="mb-4 sm:mb-6 p-3 sm:p-4 bg-[#151D30]/50 border border-[#1F293D] rounded-2xl space-y-3">
