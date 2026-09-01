@@ -6,15 +6,42 @@ import { sessionCookieOptions } from '../../../lib/cookies.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
 
+function jsonResponse(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function redirectWithMessage(request: Request, path: string, params: Record<string, string>) {
+  const url = new URL(`${import.meta.env.BASE_URL}${path}`, request.url);
+  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+  return Response.redirect(url, 302);
+}
+
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
-    const { email, password } = await request.json();
+    const contentType = request.headers.get('content-type') ?? '';
+    const acceptsHtml = (request.headers.get('accept') ?? '').includes('text/html');
+
+    let email = '';
+    let password = '';
+
+    if (contentType.includes('application/json')) {
+      const body = await request.json();
+      email = (body?.email ?? '').toString().trim().toLowerCase();
+      password = (body?.password ?? '').toString();
+    } else {
+      const formData = await request.formData();
+      email = (formData.get('email') ?? '').toString().trim().toLowerCase();
+      password = (formData.get('password') ?? '').toString();
+    }
 
     if (!email || !password) {
-      return new Response(JSON.stringify({ error: 'Email y contraseña requeridos' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const error = 'Email y contraseña requeridos';
+      return acceptsHtml
+        ? redirectWithMessage(request, 'login', { error })
+        : jsonResponse({ error }, 400);
     }
 
     // Find user
@@ -23,29 +50,27 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     });
 
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Credenciales inválidas' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const error = 'Credenciales inválidas';
+      return acceptsHtml
+        ? redirectWithMessage(request, 'login', { error })
+        : jsonResponse({ error }, 400);
     }
 
     // Check password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
     if (!isPasswordValid) {
-      return new Response(JSON.stringify({ error: 'Credenciales inválidas' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const error = 'Credenciales inválidas';
+      return acceptsHtml
+        ? redirectWithMessage(request, 'login', { error })
+        : jsonResponse({ error }, 400);
     }
 
     if (!user.isActive) {
-      return new Response(JSON.stringify({
-        error: 'Tu cuenta está desactivada. Contacta a un administrador.',
-      }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const error = 'Tu cuenta está desactivada. Contacta a un administrador.';
+      return acceptsHtml
+        ? redirectWithMessage(request, 'login', { error })
+        : jsonResponse({ error }, 403);
     }
 
     // Create session in DB
@@ -65,17 +90,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Set cookie (Secure solo en HTTPS; en LAN HTTP no se usa Secure)
     cookies.set('session_id', token, sessionCookieOptions(request, expiresAt));
 
-    return new Response(JSON.stringify({
+    if (acceptsHtml) {
+      return redirectWithMessage(request, 'dashboard', {});
+    }
+
+    return jsonResponse({
       success: true,
       user: { id: user.id, email: user.email, role: user.role }
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    }, 200);
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ error: error.message }, 500);
   }
 };
