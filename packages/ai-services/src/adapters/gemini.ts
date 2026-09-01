@@ -65,4 +65,13 @@ ${text}`,
       throw error;
     }
   }
+
+  async summarizeText(text: string, modelId?: string): Promise<string> {
+    const model = modelId || getDefaultModelId('GOOGLE', 'translation');
+    const response = await this.ai.models.generateContent({
+      model,
+      contents: `Resume la siguiente transcripción en español. Incluye un resumen breve y una sección "Puntos clave" con viñetas. No inventes información.\n\nTranscripción:\n${text}`,
+    });
+    return response.text?.trim() || '';
+  }
 }

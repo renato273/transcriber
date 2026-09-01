@@ -79,6 +79,10 @@ model TranscriptionSession {
   id             String          @id @default(uuid())
   userId         String
   title          String          // Nombre descriptivo (ej: "Clase de Programación 1")
+  summary        String?         @db.Text
+  summaryProvider ProviderType?
+  isFavorite     Boolean         @default(false)
+  tags           String[]        @default([])
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   

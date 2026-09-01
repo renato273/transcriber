@@ -92,4 +92,14 @@ export class GitHubModelsAdapter implements AIServiceInterface {
       throw error;
     }
   }
+
+  async summarizeText(text: string, modelId?: string): Promise<string> {
+    const model = modelId || getDefaultModelId('GITHUB', 'translation');
+    const completion = await this.openai.chat.completions.create({
+      model,
+      messages: [{ role: 'user', content: `Resume esta transcripción en español con un resumen breve y puntos clave. No inventes información:\n\n${text}` }],
+      temperature: 0.2,
+    });
+    return completion.choices[0].message.content?.trim() || '';
+  }
 }

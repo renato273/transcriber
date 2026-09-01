@@ -8,6 +8,9 @@ import {
   UserCheck,
   Trash2,
   KeyRound,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react';
 import { toast, confirmDialog } from './alerts';
 import AdminSubnav from './AdminSubnav.jsx';
@@ -19,6 +22,8 @@ export default function UsersAdminContent({ currentUserId }) {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
   const [passwordUserId, setPasswordUserId] = useState(null);
+  const [emailUserId, setEmailUserId] = useState(null);
+  const [emailDraft, setEmailDraft] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
@@ -56,6 +61,46 @@ export default function UsersAdminContent({ currentUserId }) {
     setPasswordUserId(null);
     setNewPassword('');
     setConfirmPassword('');
+  };
+
+  const openEmailForm = (user) => {
+    setEmailUserId(user.id);
+    setEmailDraft(user.email);
+  };
+
+  const closeEmailForm = () => {
+    setEmailUserId(null);
+    setEmailDraft('');
+  };
+
+  const saveEmail = async (user, e) => {
+    e.preventDefault();
+    const email = emailDraft.trim().toLowerCase();
+    if (!email) {
+      toast.error('Ingresá un correo electrónico.');
+      return;
+    }
+
+    setUpdatingId(user.id);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'No se pudo actualizar el correo');
+        return;
+      }
+      setUsers((prev) => prev.map((item) => (item.id === user.id ? { ...item, email: data.user.email } : item)));
+      closeEmailForm();
+      toast.success('Correo actualizado');
+    } catch {
+      toast.error('Error al conectar con el servidor.');
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const changeRole = async (user, nextRole) => {
@@ -182,6 +227,7 @@ export default function UsersAdminContent({ currentUserId }) {
 
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
       if (passwordUserId === user.id) closePasswordForm();
+      if (emailUserId === user.id) closeEmailForm();
       toast.success(data.message || 'Usuario eliminado');
     } catch (e) {
       toast.error('Error al conectar con el servidor.');
@@ -297,6 +343,7 @@ export default function UsersAdminContent({ currentUserId }) {
             const isLastActiveAdmin = user.role === 'ADMIN' && user.isActive && activeAdmins <= 1;
             const busy = updatingId === user.id;
             const showPassword = passwordUserId === user.id;
+            const showEmailForm = emailUserId === user.id;
 
             return (
               <div
@@ -310,7 +357,25 @@ export default function UsersAdminContent({ currentUserId }) {
                 <div class="flex flex-col sm:flex-row sm:items-center gap-4">
                   <div class="flex-grow min-w-0 space-y-1">
                     <div class="flex flex-wrap items-center gap-2">
-                      <p class="text-sm font-semibold text-white truncate">{user.email}</p>
+                      {showEmailForm ? (
+                        <form onSubmit={(e) => saveEmail(user, e)} class="flex items-center gap-1.5 min-w-0">
+                          <input
+                            type="email"
+                            value={emailDraft}
+                            onChange={(e) => setEmailDraft(e.target.value)}
+                            class="min-w-0 w-56 max-w-full px-2 py-1 bg-[#0E1524] border border-primary rounded-lg text-sm font-semibold text-white focus:outline-none"
+                            aria-label="Correo electrónico"
+                            autoFocus
+                          />
+                          <button type="submit" disabled={busy} class="p-1.5 text-green-400 hover:bg-green-950/30 rounded-lg disabled:opacity-50" title="Guardar correo"><Check class="w-4 h-4" /></button>
+                          <button type="button" onClick={closeEmailForm} disabled={busy} class="p-1.5 text-gray-400 hover:bg-[#1E2942] rounded-lg disabled:opacity-50" title="Cancelar"><X class="w-4 h-4" /></button>
+                        </form>
+                      ) : (
+                        <>
+                          <p class="text-sm font-semibold text-white truncate">{user.email}</p>
+                          <button type="button" onClick={() => openEmailForm(user)} disabled={busy} class="p-1.5 text-gray-500 hover:text-white hover:bg-[#1E2942] rounded-lg disabled:opacity-50" title="Editar correo"><Pencil class="w-3.5 h-3.5" /></button>
+                        </>
+                      )}
                       {isSelf && (
                         <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary-light border border-primary/25">
                           Tú
